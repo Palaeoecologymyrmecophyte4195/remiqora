@@ -2,7 +2,9 @@
 <#
 Clones the original ACE-Step-1.5 and audio.cpp (YuE2) repositories into
 external/, applies Remiqora's small patches on top (see
-external/patches/README.md), and builds/prepares each engine.
+external/patches/README.md), builds/prepares each engine, sets up a
+Demucs (stem separation) uv project in external/Demucs, and writes
+backend/.env with all of the above plus an auto-detected FFMPEG_BIN_DIR.
 
 Re-run any time - every step is idempotent (skips work that is already done).
 #>
@@ -28,6 +30,29 @@ function Assert-Command($name, $installHint) {
         return $false
     }
     return $true
+}
+
+function Find-FfmpegBinDir {
+    $cmd = Get-Command "ffmpeg.exe" -ErrorAction SilentlyContinue
+    if ($cmd) {
+        return Split-Path -Parent $cmd.Source
+    }
+    # Not on PATH yet - most likely setup_prereqs.bat just installed it via
+    # winget in *this same terminal*; PATH only picks that up in a new one.
+    # Look directly in winget's package cache instead of waiting for that.
+    $searchRoots = @(
+        (Join-Path $env:LOCALAPPDATA "Microsoft\WinGet\Packages"),
+        (Join-Path $env:ProgramFiles "WinGet\Packages")
+    ) | Where-Object { Test-Path $_ }
+    foreach ($searchRoot in $searchRoots) {
+        $found = Get-ChildItem -Path $searchRoot -Filter "ffmpeg.exe" -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "Gyan\.FFmpeg" } |
+            Select-Object -First 1
+        if ($found) {
+            return $found.DirectoryName
+        }
+    }
+    return $null
 }
 
 function Initialize-Repo($dirName, $repoUrl, $refName, $patchFile) {
@@ -152,24 +177,104 @@ if ($SkipWeights) {
 # here - acestep-api downloads them itself via HuggingFace/ModelScope on its
 # first request, the same way its Gradio UI does.
 
+Write-Step "Demucs (stem separation)"
+# Not an upstream repo to clone - just a throwaway uv project with the
+# `demucs` PyPI package installed into it. Written out explicitly (rather
+# than a plain "uv init" + "uv add demucs") to avoid two problems hit in
+# practice:
+#  1. A bare "uv add demucs" resolves torch from plain PyPI, which on
+#     Windows is a CPU-only wheel - stem separation would silently run on
+#     CPU instead of alongside the GPU model like the UI expects. Routing
+#     "torch" at PyTorch's own cu128 wheel index below (same index
+#     ACE-Step-1.5's own pyproject.toml uses) fixes that.
+#  2. "uv init"'s default requires-python tracks whatever Python is newest
+#     on the machine, which can be newer than what PyTorch's cu128 wheels
+#     support yet - uv then falls back to the CPU wheel again, silently.
+#     Pinning requires-python to ACE-Step-1.5's own range sidesteps that.
+# `numpy` is listed explicitly too: demucs imports it directly (see
+# demucs/transformer.py) but its own package metadata doesn't declare it as
+# a dependency, so it's otherwise missing and demucs fails to import.
+$demucsDir = Join-Path $externalDir "Demucs"
+if (-not (Test-Path $demucsDir)) {
+    New-Item -ItemType Directory -Path $demucsDir -Force | Out-Null
+}
+$demucsProjectFile = Join-Path $demucsDir "pyproject.toml"
+if (-not (Test-Path $demucsProjectFile)) {
+    Write-Host "Writing $demucsProjectFile ..."
+    @'
+[project]
+name = "demucs-runner"
+version = "0.1.0"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "demucs>=4.0.1",
+    "numpy>=1.26.4",
+    "torch>=2.11.0",
+]
+
+[tool.uv]
+package = false
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+'@ | Set-Content -Encoding utf8 $demucsProjectFile
+}
+
+if (Assert-Command "uv" "Install it from https://docs.astral.sh/uv/getting-started/installation/") {
+    Push-Location $demucsDir
+    try {
+        Write-Host "Running 'uv sync' for Demucs (this also pulls the CUDA build of PyTorch, can take a while) ..."
+        uv sync
+    } finally {
+        Pop-Location
+    }
+} else {
+    Write-Host "Skipped Demucs 'uv sync' - install uv and re-run this script." -ForegroundColor Yellow
+}
+
 Write-Step "backend/.env"
 $envExample = Join-Path $root "backend\.env.example"
 $envFile = Join-Path $root "backend\.env"
+$ffmpegBinDir = Find-FfmpegBinDir
+if ($ffmpegBinDir) {
+    Write-Host "Found ffmpeg at $ffmpegBinDir"
+} else {
+    Write-Host "Could not find ffmpeg (install it via setup_prereqs.bat) - FFMPEG_BIN_DIR will need setting by hand." -ForegroundColor Yellow
+}
 if (-not (Test-Path $envFile)) {
-    (Get-Content $envExample) `
+    $envLines = (Get-Content $envExample) `
         -replace [regex]::Escape("E:\AI\ACE\ACE-Step-1.5"), $aceDir `
         -replace [regex]::Escape("E:\AI\YuE2-3B"), $audioCppDir `
-        | Set-Content $envFile
+        -replace [regex]::Escape("E:\AI\Demucs"), $demucsDir
+    if ($ffmpegBinDir) {
+        $envLines = $envLines -replace [regex]::Escape("E:\AI\ACE\tools\ffmpeg-shared\ffmpeg-master-latest-win64-gpl-shared\bin"), $ffmpegBinDir
+    }
+    $envLines | Set-Content $envFile
     Write-Host "Wrote backend/.env pointing at the cloned repos."
-    Write-Host "Still edit FFMPEG_BIN_DIR and CUDA_BIN_DIR in backend/.env for your machine." -ForegroundColor Yellow
+    if ($ffmpegBinDir) {
+        Write-Host "Still check CUDA_BIN_DIR in backend/.env for your machine." -ForegroundColor Yellow
+    } else {
+        Write-Host "Still edit FFMPEG_BIN_DIR and CUDA_BIN_DIR in backend/.env for your machine." -ForegroundColor Yellow
+    }
 } else {
     Write-Host "backend/.env already exists - not overwriting. Cloned repo paths:"
     Write-Host "  ACE_STEP_DIR=$aceDir"
     Write-Host "  YUE2_DIR=$audioCppDir"
+    Write-Host "  DEMUCS_DIR=$demucsDir"
+    if ($ffmpegBinDir) {
+        Write-Host "  FFMPEG_BIN_DIR=$ffmpegBinDir (detected - edit backend/.env if it doesn't already match)"
+    }
 }
 
 Write-Step "Done"
 Write-Host "Remaining manual steps (see README.md):"
-Write-Host "  - Install ffmpeg and point FFMPEG_BIN_DIR at its bin folder."
+if (-not $ffmpegBinDir) {
+    Write-Host "  - Install ffmpeg (setup_prereqs.bat) and point FFMPEG_BIN_DIR at its bin folder."
+}
 Write-Host "  - ACE-Step's own checkpoints download automatically on its first request."
 Write-Host "  - Then run dev.bat or prod_run.bat."

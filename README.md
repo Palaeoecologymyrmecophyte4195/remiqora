@@ -213,7 +213,13 @@ The script:
    `yue2,sheetsage2,muscriptor` models) for audio.cpp.
 4. Downloads the YuE2/SheetSage2/MuScriptor GGUF weights (~10 GB) via
    audio.cpp's `tools/model_manager_v2.py`.
-5. Creates `backend/.env` with paths to the freshly cloned repositories.
+5. Sets up a `demucs` uv project in `external/Demucs` for stem separation,
+   routed at PyTorch's cu128 wheel index so it gets a CUDA build (a plain
+   `uv add demucs` would silently resolve a CPU-only torch wheel instead).
+6. Creates `backend/.env` with paths to the freshly cloned repositories,
+   including `FFMPEG_BIN_DIR` — auto-detected from `ffmpeg`'s winget install
+   (`setup_prereqs.bat`), even right after installing it in the same
+   terminal, before a new one would pick it up on PATH.
 
 ACE-Step's own weights don't need a separate download — `acestep-api` pulls
 them from HuggingFace/ModelScope on first request, the same way its Gradio
@@ -226,9 +232,10 @@ CMake, the CUDA Toolkit and Visual Studio Build Tools (C++ workload) to
 already be installed — if any is missing, that step is simply skipped with a
 hint on what to install.
 
-After that, the only manual steps left are:
-- installing ffmpeg and pointing `FFMPEG_BIN_DIR` at it in `backend/.env`;
-- checking `CUDA_BIN_DIR` in `backend/.env`.
+After that, the only manual step left is checking `CUDA_BIN_DIR` in
+`backend/.env` (`FFMPEG_BIN_DIR` is filled in automatically — unless ffmpeg
+wasn't found at all, in which case the script says so and it needs setting
+by hand).
 
 Hard machine requirements the script can't remove: Windows, a CUDA-capable
 NVIDIA GPU (tested on an RTX 4080 16 GB), and an installed video driver.
@@ -246,7 +253,7 @@ prod_run.bat
 ```
 Builds the client via `npm run build` and serves the finished SPA bundle together with the API at [http://127.0.0.1:9000](http://127.0.0.1:9000).
 
-Stem separation needs one more uv project with Demucs — set up the same way as ACE-Step (`uv init` + `uv add demucs` in its own folder); the `htdemucs` weights download automatically on first use.
+Stem separation's `demucs` uv project is set up by `setup_models.bat` above; the `htdemucs` weights themselves download automatically on first use.
 
 ---
 
@@ -257,12 +264,14 @@ Settings live in `backend/.env` (template: `backend/.env.example`;
 ```ini
 ACE_STEP_DIR=E:\AI\ACE\ACE-Step-1.5
 YUE2_DIR=E:\AI\YuE2-3B
+DEMUCS_DIR=E:\AI\Demucs
 FFMPEG_BIN_DIR=E:\AI\ACE\tools\ffmpeg-shared\ffmpeg-master-latest-win64-gpl-shared\bin
 CUDA_BIN_DIR=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4\bin
 ```
 
 - `ACE_STEP_DIR` — root of the cloned and patched ACE-Step-1.5.
 - `YUE2_DIR` — root of the cloned and patched audio.cpp (where `audiocpp_server.exe` is built and the YuE2/SheetSage2/MuScriptor GGUF weights live).
+- `DEMUCS_DIR` — root of the `demucs` uv project used for stem separation.
 - `FFMPEG_BIN_DIR` — folder containing `ffmpeg.exe`/`ffprobe.exe`.
 - `CUDA_BIN_DIR` — the `bin` folder of the installed CUDA Toolkit (needs to be on PATH for `audiocpp_server.exe`).
 
