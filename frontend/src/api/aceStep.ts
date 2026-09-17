@@ -11,6 +11,7 @@ export interface GenerateMusicRequest {
   bpm?: number
   key_scale?: string
   time_signature?: string
+  vocal_language?: string
   inference_steps?: number
   guidance_scale?: number
   seed?: number

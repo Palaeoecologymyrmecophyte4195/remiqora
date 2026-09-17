@@ -119,6 +119,8 @@ export default {
     keyScalePlaceholder: 'C major',
     timeSignature: 'Time signature',
     timeSignatureAuto: 'auto',
+    vocalLanguage: 'Vocal language',
+    vocalLanguageAuto: 'auto (from lyrics)',
     inferenceSteps: 'Inference steps',
     inferenceStepsTurbo: '8 (default)',
     inferenceStepsNormal: '32 (default)',
@@ -238,6 +240,7 @@ export default {
         rows: [
           { param: 'Format', what: 'The output file format. mp3 is more compact and enough for listening; wav/flac are lossless but 5–10x larger.' },
           { param: 'BPM / Key / Time signature', what: 'Explicit musical parameters. If left blank, the model determines them from the style text itself — set them manually only if precision matters (e.g. for mixing with other tracks).' },
+          { param: 'Vocal language', what: 'Constrains what language the vocals/lyrics are sung in. Left on "auto", the model infers it from the lyrics text itself, which can misfire for short or ambiguous lyrics — set it explicitly if the vocals come out in the wrong language.' },
           { param: 'Inference steps', what: 'The number of diffusion steps. More steps can mean cleaner audio but slower generation; past a certain point the quality gain is barely noticeable. Turbo models default to 8 steps (they\'re optimized for that), regular ones to 32. Set manually only if you want it faster (fewer steps) or more thorough (more).' },
           { param: 'Guidance scale', what: 'How strictly the model follows your description (prompt). Higher follows style tags more precisely, but at very high values the sound can become "over-compressed"/artifacted; lower is more natural but less predictable. Not used for turbo models (they have their own built-in logic). Default is 7.0, a reasonable range is usually 3–12.' },
           { param: 'Seed', what: 'A number that determines generation randomness. Empty = a new random result each time. The same seed plus the same other parameters nearly reproduces the same result — useful when you want to tweak one style tag and compare.' },
