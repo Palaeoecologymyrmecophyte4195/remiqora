@@ -43,11 +43,11 @@
 
 ## Why this exists
 
-ACE-Step and YuE2 are two independent music generation engines, each with its own web UI, its own result-storage format, and its own process that has to be started and stopped by hand. They don't fit on one GPU at the same time. Remiqora solves this with a single layer on top:
+ACE-Step and YuE2 are two independent music generation engines, each with its own web UI, its own result-storage format, and its own process that has to be started and stopped by hand. They typically cannot run simultaneously on a single consumer GPU. Remiqora solves this with a single layer on top:
 
 - **One UI** instead of two different interfaces with different UX.
 - **Mutually-exclusive orchestrator**: pick a model in the header — it starts up, and the other one stops on its own. No need to manually kill processes before starting the other engine.
-- **Shared storage**: every track (generated, uploaded, or assembled in the editor) lives in one SQLite database and is available from every module — Demucs, MIDI, the mixer and the editor all work off the same library instead of three separate ones.
+- **Shared storage**: every track (generated, uploaded, or assembled in the editor) is tracked in a centralized SQLite database and shared folder, available from every module — Demucs, MuScriptor, the mixer and the editor all work off the same library instead of three separate ones.
 - **A DAW on top of generation**: a generated track isn't the end point, it's raw material — split it into stems, mix it down, drag it onto a timeline, blend it with other tracks, and export.
 - **Built-in LoRA training**: not just generation — fine-tune ACE-Step on your own voice or style right from the browser, no console needed.
 
