@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+/*
+ * Dark-only theme, matching the accent gradient + status-color language both
+ * original per-model UIs already used (purple->pink accent, yellow=queued,
+ * purple=running, green=done, red=failed, gray=cancelled).
+ */
+@theme {
+  --color-bg: #0f0f14;
+  --color-panel: #1a1a22;
+  --color-panel-2: #20202b;
+  --color-border: #2e2e3a;
+  --color-text: #e4e4ec;
+  --color-text-dim: #9a9aab;
+  --color-accent1: #a855f7;
+  --color-accent2: #ec4899;
+  --color-status-queued: #eab308;
+  --color-status-running: #a855f7;
+  --color-status-done: #22c55e;
+  --color-status-failed: #ef4444;
+  --color-status-cancelled: #6b7280;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: 15px/1.5 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+}
+
+#app {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Browsers default <button> to cursor: default (unlike <a>) and Tailwind's
+   Preflight deliberately leaves that as-is, so most of this app's ~100
+   buttons showed the arrow cursor instead of a hand unless individually
+   given cursor-pointer. Fix it once, globally, except while disabled. */
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+.accent-gradient {
+  background-image: linear-gradient(135deg, var(--color-accent1), var(--color-accent2));
+}
+
+/* Page fade transition */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* Collapsible slide transition */
+.slide-enter-active,
+.slide-leave-active {
+  transition: max-height 0.2s ease, opacity 0.2s ease;
+  max-height: 400px;
+  overflow: hidden;
+}
+.slide-enter-from,
+.slide-leave-to {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+}
