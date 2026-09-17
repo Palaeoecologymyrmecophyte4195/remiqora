@@ -43,13 +43,29 @@ function Initialize-Repo($dirName, $repoUrl, $refName, $patchFile) {
         $alreadyDone = Test-Path $markerFile
         if (-not $alreadyDone) {
             Write-Host "Checking out $refName ..."
-            git fetch origin $refName --depth 1 2>$null
+            # A plain "git clone" (no --single-branch/--depth) already fetches
+            # every branch's full history, so the pinned commit is normally
+            # already present - just check it out directly. We deliberately
+            # avoid "git fetch origin <sha>": GitHub rejects fetching a raw
+            # commit SHA as if it were a ref name ("couldn't find remote ref"),
+            # and $ErrorActionPreference = "Stop" turns that expected stderr
+            # output into a script-ending exception before the $LASTEXITCODE
+            # fallback below ever gets a chance to run.
+            $prevPref = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
             git checkout $refName 2>$null
-            if ($LASTEXITCODE -ne 0) {
-                # Shallow fetch may not contain the exact commit if history was
-                # rewritten upstream; fall back to a full fetch.
-                git fetch origin --unshallow 2>$null
-                git checkout $refName
+            $checkedOut = ($LASTEXITCODE -eq 0)
+            if (-not $checkedOut) {
+                # Commit isn't reachable yet (e.g. history was rewritten
+                # upstream since this ref was pinned, or this clone happened
+                # to be shallow) - fetch everything and retry once.
+                git fetch origin 2>$null
+                git checkout $refName 2>$null
+                $checkedOut = ($LASTEXITCODE -eq 0)
+            }
+            $ErrorActionPreference = $prevPref
+            if (-not $checkedOut) {
+                throw "Could not check out '$refName' in $dir - it may no longer exist upstream. See external/patches/README.md for how to bump the pinned commit."
             }
 
             if ($patchFile) {
