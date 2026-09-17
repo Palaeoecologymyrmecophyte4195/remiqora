@@ -82,7 +82,7 @@ Attaching a reference track unlocks 5 remix scenarios:
 - **Add a part** — compose one missing instrument on top of the mix.
 - **Finish the composition** — the same, but for a whole list of parts at once.
 
-Plus: 10–300 s duration, batch of 1/2/4 variants, mp3/wav/flac formats, advanced parameters (BPM, key, time signature, inference steps, guidance scale, seed), LoRA adapter support with adjustable strength, local parameter presets, and a "Stop all" button for bulk job cancellation.
+Plus: 10–300 s duration, batch of 1/2/4 variants, mp3/wav/flac formats, advanced parameters (BPM, key, time signature, vocal language, inference steps, guidance scale, seed), LoRA adapter support with adjustable strength, local presets, and a "Stop all" button for bulk job cancellation.
 
 ## YuE2 and SheetSage2: generation
 
