@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/en/01-home.png" alt="Home screen" width="860">
+  <img src="docs/hero-poster.png" alt="Remiqora — made with AI, made by you" width="900">
 </p>
 
 <p align="center">
