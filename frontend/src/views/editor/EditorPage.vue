@@ -14,6 +14,8 @@ import * as tracksApi from '../../api/tracks'
 import ChannelStrip from '../../components/shared/ChannelStrip.vue'
 import TimelineLane from '../../components/editor/TimelineLane.vue'
 import LibraryPicker from '../../components/editor/LibraryPicker.vue'
+import PlayIcon from '../../components/shared/icons/PlayIcon.vue'
+import PauseIcon from '../../components/shared/icons/PauseIcon.vue'
 
 const props = defineProps<{ id: string }>()
 
