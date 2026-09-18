@@ -11,12 +11,15 @@ machine only means editing that one file, not this source file.
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+IS_WINDOWS = sys.platform == "win32"
 
 
 def _env_path(name: str, default: str) -> Path:
@@ -116,6 +119,22 @@ CUDA_BIN64_DIR = CUDA_BIN_DIR / "x64"
 ACE_STEP_API_PORT = 8001
 YUE2_SERVER_PORT = 8080
 
+# audiocpp_server is built from source by setup_models.ps1 on Windows (CUDA
+# backend) and placed under this same build/<preset>/bin/ layout by
+# setup_models.sh on macOS - by default from audio.cpp's own prebuilt
+# Apple-Silicon/Metal release (no compiler needed), or from source (Metal
+# backend, via scripts/build_metal.sh) if it was run with --from-source.
+if IS_WINDOWS:
+    _YUE2_BUILD_PRESET = "windows-cuda-release"
+    _YUE2_SERVER_BIN = "audiocpp_server.exe"
+    _YUE2_BACKEND = "cuda"
+    _YUE2_EXTRA_PATH_DIRS = [CUDA_BIN64_DIR, CUDA_BIN_DIR]
+else:
+    _YUE2_BUILD_PRESET = "macos-metal-release"
+    _YUE2_SERVER_BIN = "audiocpp_server"
+    _YUE2_BACKEND = "metal"
+    _YUE2_EXTRA_PATH_DIRS = []
+
 MODELS: dict[str, ModelDefinition] = {
     "ace_step": ModelDefinition(
         id="ace_step",
@@ -157,10 +176,10 @@ MODELS: dict[str, ModelDefinition] = {
                 name="yue2_server",
                 cwd=YUE2_DIR,
                 cmd=[
-                    str(YUE2_DIR / "build" / "windows-cuda-release" / "bin" / "audiocpp_server.exe"),
-                    "--ui", "--ui-management", "--backend", "cuda",
+                    str(YUE2_DIR / "build" / _YUE2_BUILD_PRESET / "bin" / _YUE2_SERVER_BIN),
+                    "--ui", "--ui-management", "--backend", _YUE2_BACKEND,
                 ],
-                extra_path_dirs=[CUDA_BIN64_DIR, CUDA_BIN_DIR],
+                extra_path_dirs=_YUE2_EXTRA_PATH_DIRS,
                 health_url=f"http://127.0.0.1:{YUE2_SERVER_PORT}/health",
                 startup_timeout=300.0,
             ),

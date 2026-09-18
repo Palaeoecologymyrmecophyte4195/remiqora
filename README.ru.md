@@ -16,8 +16,8 @@
 <p align="center">
   <img alt="Статус" src="https://img.shields.io/badge/статус-в%20разработке-eab308?style=flat-square">
   <a href="LICENSE.ru.md"><img alt="Лицензия" src="https://img.shields.io/badge/лицензия-MIT-22c55e?style=flat-square"></a>
-  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-0f0f14?style=flat-square">
-  <img alt="GPU" src="https://img.shields.io/badge/GPU-NVIDIA%20CUDA-76B900?style=flat-square">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-0f0f14?style=flat-square">
+  <img alt="GPU" src="https://img.shields.io/badge/GPU-NVIDIA%20CUDA%20%7C%20Apple%20Metal-76B900?style=flat-square">
   <img alt="Stack" src="https://img.shields.io/badge/stack-Vue%203%20%2B%20FastAPI-a855f7?style=flat-square">
   <img alt="UI languages" src="https://img.shields.io/badge/UI-RU%20%2F%20EN-ec4899?style=flat-square">
   <a href="https://ko-fi.com/inikolax"><img alt="Поддержать на Ko-fi" src="https://img.shields.io/badge/Поддержать-Ko--fi-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white"></a>
@@ -197,6 +197,15 @@ Build Tools/CUDA — вручную по ссылкам, которые скри
 После установки закройте терминал и откройте новый, чтобы PATH подхватил
 свежепоставленные инструменты.
 
+**На macOS (Apple Silicon):**
+```sh
+./setup_prereqs.sh
+```
+Через [Homebrew](https://brew.sh) ставит Git, Python, `uv`, Node.js, CMake,
+ffmpeg и Ninja. Отдельного шага с GPU-драйвером нет: Metal встроен в macOS.
+CMake/Ninja нужны только для пути `--from-source` ниже — установка YuE2 по
+умолчанию вообще не требует компилятора.
+
 ### Шаг 1: движки генерации
 
 ```cmd
@@ -242,6 +251,42 @@ CMake, CUDA Toolkit и Visual Studio Build Tools (C++ workload) — при
 NVIDIA GPU с поддержкой CUDA (тестировалось на RTX 4080 16 ГБ) и
 установленный видеодрайвер.
 
+**На macOS (Apple Silicon):**
+```sh
+./setup_models.sh
+```
+Адаптировано под macOS, с одним отличием от шагов Windows выше: по
+умолчанию `audiocpp_server` устанавливается из готового **прекомпилированного
+macOS/Metal релиза** audio.cpp (закреплённый тег, sha256 проверяется перед
+распаковкой) — компилятор вообще не нужен, в отличие от Windows-пути,
+который всегда собирает из исходников, поскольку готового CUDA-релиза не
+существует. Uv-проект Demucs тоже не привязывается к CUDA-индексу колёс —
+обычная зависимость `torch` и так резолвится в MPS-совместимое колесо на
+darwin/arm64, точно так же, как в `pyproject.toml` самого ACE-Step-1.5. В
+записанном `backend/.env` нет `CUDA_BIN_DIR` — CUDA Toolkit на этом пути
+не нужен.
+
+Флаг `--from-source` вместо скачивания релиза соберёт audio.cpp из того же
+закреплённого коммита ветки `dev`, что использует Windows (пригодится, если
+релиз отстал от фикса, который есть только в `dev`, либо на Intel Mac, для
+которого готового бинарника нет) — для этого пути нужен полный **Xcode.app**
+(не только Command Line Tools) из-за Metal-компилятора шейдеров;
+`setup_prereqs.sh` выведет точные шаги, если его не хватает. `--skip-build` /
+`--skip-weights` — аналоги `-SkipBuild` / `-SkipWeights`. В остальном скрипт
+ожидает, что `git`, `uv` и Python 3 уже установлены (а для `--from-source`
+ещё и `cmake`).
+
+Жёсткие требования к машине на пути по умолчанию (готовый бинарник): macOS,
+Apple Silicon (чип серии M) — для Intel нужен `--from-source`. Проверено на
+MacBook Air, Apple M5, 24 ГБ RAM — включая прогон с абсолютно чистого
+состояния (без единого brew-пакета и файлов проекта) до генерации
+аудио через YuE2 на Metal-бэкенде.
+Этот путь новее и меньше обкатан, чем Windows/CUDA — ожидайте, что будет медленнее
+(Metal вместо CUDA). Именно `--from-source` может периодически требовать
+ручной подстройки (сдвинуть закреплённый коммит), если ветка `dev` audio.cpp
+уйдёт вперёд; путь с готовым релизом закреплён на фиксированном теге и сам
+по себе не «уезжает».
+
 ### Шаг 2: запуск
 
 ```cmd
@@ -256,6 +301,10 @@ prod_run.bat
 Собирает клиент через `npm run build` и раздаёт готовый SPA-дистрибутив вместе с API на [http://127.0.0.1:9000](http://127.0.0.1:9000).
 
 Uv-проект `demucs` для разделения на стемы поднимает сам `setup_models.bat` (см. выше); веса `htdemucs` скачиваются отдельно и сами при первом использовании.
+
+**На macOS:** аналоги — `./dev.sh` и `./prod_run.sh`, ведут себя так же, только
+бэкенд и фронтенд запускаются как фоновые задачи самого скрипта (остановить
+оба — Ctrl+C), а не в отдельных окнах терминала.
 
 ---
 
@@ -275,7 +324,7 @@ CUDA_BIN_DIR=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4\bin
 - `YUE2_DIR` — корень склонированного и запатченного audio.cpp (там же собран `audiocpp_server.exe` и лежат GGUF-веса YuE2/SheetSage2/MuScriptor).
 - `DEMUCS_DIR` — корень uv-проекта с `demucs`, используемого для разделения на стемы.
 - `FFMPEG_BIN_DIR` — папка с `ffmpeg.exe`/`ffprobe.exe`.
-- `CUDA_BIN_DIR` — папка `bin` установленного CUDA Toolkit (нужна в PATH для `audiocpp_server.exe`).
+- `CUDA_BIN_DIR` — папка `bin` установленного CUDA Toolkit (нужна в PATH для `audiocpp_server.exe`). Только для Windows — на macOS остаётся пустым, там YuE2 работает через Metal-бэкенд.
 
 ---
 
@@ -283,4 +332,5 @@ CUDA_BIN_DIR=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4\bin
 
 - ACE-Step и YuE2 не могут работать одновременно — одна GPU на двоих, оркестратор переключает их взаимоисключающе.
 - Транскрипция в MIDI требует активной именно YuE2 (модель MuScriptor подгружается в её процесс).
-- Только Windows — скрипты установки и запуска написаны под `.bat`/`.ps1`.
+- Поддерживаются Windows (NVIDIA CUDA) и macOS/Apple Silicon (Metal/MPS) — под первую написаны `.bat`/`.ps1`, под вторую `.sh`. Скриптов под Linux пока нет, хотя сам бэкенд уже не содержит Windows-специфичного кода, который бы это блокировал.
+- Путь macOS/Metal новее и меньше обкатан, чем Windows/CUDA — ожидайте, что будет медленнее. По умолчанию он ставит YuE2 из готового релиза с закреплённым тегом (компилятор не нужен); `--from-source` собирает тот же коммит `dev`, что и Windows, и может изредка требовать сдвинуть этот пин, если `dev` уйдёт вперёд.

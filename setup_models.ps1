@@ -96,6 +96,17 @@ function Initialize-Repo($dirName, $repoUrl, $refName, $patchFile) {
             if ($patchFile) {
                 Write-Host "Applying $(Split-Path -Leaf $patchFile) ..."
                 git apply --whitespace=nowarn $patchFile
+                if ($LASTEXITCODE -ne 0) {
+                    # Unlike the git checkout retry above, a failed patch has no
+                    # fallback here - without this check, a native git failure
+                    # doesn't reliably raise a terminating error even under
+                    # $ErrorActionPreference = "Stop" (that only reliably applies
+                    # to cmdlets, not exit codes from external processes), so a
+                    # broken patch could otherwise fall straight through to the
+                    # marker-file write below and get marked "done" while never
+                    # having actually been applied.
+                    throw "Failed to apply patch '$patchFile' to $dir - see the git apply output above."
+                }
             }
             New-Item -ItemType File -Path $markerFile -Force | Out-Null
         } else {

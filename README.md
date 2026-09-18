@@ -16,8 +16,8 @@
 <p align="center">
   <img alt="Status" src="https://img.shields.io/badge/status-in%20development-eab308?style=flat-square">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square"></a>
-  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-0f0f14?style=flat-square">
-  <img alt="GPU" src="https://img.shields.io/badge/GPU-NVIDIA%20CUDA-76B900?style=flat-square">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-0f0f14?style=flat-square">
+  <img alt="GPU" src="https://img.shields.io/badge/GPU-NVIDIA%20CUDA%20%7C%20Apple%20Metal-76B900?style=flat-square">
   <img alt="Stack" src="https://img.shields.io/badge/stack-Vue%203%20%2B%20FastAPI-a855f7?style=flat-square">
   <img alt="UI languages" src="https://img.shields.io/badge/UI-EN%20%2F%20RU-ec4899?style=flat-square">
   <a href="https://ko-fi.com/inikolax"><img alt="Support on Ko-fi" src="https://img.shields.io/badge/Support-Ko--fi-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white"></a>
@@ -197,6 +197,15 @@ screen and usually needs a reboot on your schedule, not the script's).
 After installing, close the terminal and open a new one so PATH picks up the
 freshly installed tools.
 
+**On macOS (Apple Silicon):**
+```sh
+./setup_prereqs.sh
+```
+Via [Homebrew](https://brew.sh), installs Git, Python, `uv`, Node.js, CMake,
+ffmpeg and Ninja. No separate GPU driver step: Metal is built into macOS.
+CMake/Ninja are only actually used by the `--from-source` build path below —
+the default YuE2 setup needs no compiler at all.
+
 ### Step 1: generation engines
 
 ```cmd
@@ -240,6 +249,40 @@ by hand).
 Hard machine requirements the script can't remove: Windows, a CUDA-capable
 NVIDIA GPU (tested on an RTX 4080 16 GB), and an installed video driver.
 
+**On macOS (Apple Silicon):**
+```sh
+./setup_models.sh
+```
+Adapted for macOS, with one difference from the Windows steps above: by
+default, `audiocpp_server` is installed from audio.cpp's own **prebuilt
+macOS/Metal release** (a pinned tag, sha256-verified before extracting) —
+no compiler needed at all, unlike the Windows path, which always builds
+from source since there's no prebuilt CUDA release. The Demucs uv project
+also isn't routed at a CUDA wheel index — a plain `torch` dependency
+already resolves an MPS-capable wheel on darwin/arm64, same as
+ACE-Step-1.5's own `pyproject.toml` does. The written `backend/.env` has no
+`CUDA_BIN_DIR` — there's no CUDA toolkit on this path.
+
+Pass `--from-source` to build audio.cpp from the same pinned `dev` commit
+Windows uses instead of downloading the release (useful if the release lags
+behind a `dev`-only fix, or on Intel Macs, which the prebuilt asset doesn't
+cover) — that path needs full **Xcode.app** (not just the Command Line
+Tools) for its Metal shader compiler; `setup_prereqs.sh` prints exact steps
+if it's missing. `--skip-build` / `--skip-weights` mirror `-SkipBuild` /
+`-SkipWeights`. Otherwise it expects `git`, `uv` and Python 3 to already be
+installed (`cmake` too, for `--from-source`).
+
+Hard machine requirements this path can't remove: macOS, Apple Silicon
+(M-series) for the default prebuilt path (Intel needs `--from-source`).
+Tested on a MacBook Air, Apple M5, 24 GB RAM — including a from-scratch run
+against a machine with no prior Homebrew packages or project state, all the
+way through generating audio with YuE2 on the Metal backend.
+This path is newer and less exercised than the Windows/CUDA one — expect it
+to be slower (Metal instead of CUDA). `--from-source` in particular may
+need occasional manual fixing up (a bumped commit pin) if audio.cpp's `dev`
+branch drifts upstream; the default release-based path is pinned to a fixed
+tag instead, so it doesn't drift on its own.
+
 ### Step 2: run
 
 ```cmd
@@ -254,6 +297,10 @@ prod_run.bat
 Builds the client via `npm run build` and serves the finished SPA bundle together with the API at [http://127.0.0.1:9000](http://127.0.0.1:9000).
 
 Stem separation's `demucs` uv project is set up by `setup_models.bat` above; the `htdemucs` weights themselves download automatically on first use.
+
+**On macOS:** `./dev.sh` and `./prod_run.sh` are the equivalents — same
+behavior, except the backend/frontend run as background jobs of the script
+itself (stop both with Ctrl+C) rather than in separate terminal windows.
 
 ---
 
@@ -273,7 +320,7 @@ CUDA_BIN_DIR=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4\bin
 - `YUE2_DIR` — root of the cloned and patched audio.cpp (where `audiocpp_server.exe` is built and the YuE2/SheetSage2/MuScriptor GGUF weights live).
 - `DEMUCS_DIR` — root of the `demucs` uv project used for stem separation.
 - `FFMPEG_BIN_DIR` — folder containing `ffmpeg.exe`/`ffprobe.exe`.
-- `CUDA_BIN_DIR` — the `bin` folder of the installed CUDA Toolkit (needs to be on PATH for `audiocpp_server.exe`).
+- `CUDA_BIN_DIR` — the `bin` folder of the installed CUDA Toolkit (needs to be on PATH for `audiocpp_server.exe`). Windows only — on macOS this is left unset, since YuE2 runs on the Metal backend instead.
 
 ---
 
@@ -281,4 +328,5 @@ CUDA_BIN_DIR=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4\bin
 
 - ACE-Step and YuE2 can't run at the same time — one GPU for both, the orchestrator switches between them mutually exclusively.
 - MIDI transcription requires YuE2 specifically to be active (the MuScriptor model loads into its process).
-- Windows only — the install/run scripts are written as `.bat`/`.ps1`.
+- Windows (NVIDIA CUDA) and macOS/Apple Silicon (Metal/MPS) are supported — `.bat`/`.ps1` scripts for the former, `.sh` scripts for the latter. No Linux scripts yet, though the backend itself has no Windows-only code left blocking it.
+- The macOS/Metal path is newer and less battle-tested than the Windows/CUDA one; expect it to be slower. By default it installs a prebuilt YuE2 binary pinned to a fixed release tag (no compiler needed); `--from-source` instead builds the same `dev` commit Windows uses, and may occasionally need that pin bumped if `dev` drifts.
