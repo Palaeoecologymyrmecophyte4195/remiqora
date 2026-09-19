@@ -45,18 +45,84 @@ export function useTimelineEngine() {
 
   async function decodeAll(project: TimelineProject): Promise<Map<string, AudioBuffer>> {
     const urls = new Set<string>()
-    for (const lane of project.lanes) for (const clip of lane.clips) urls.add(clip.sourceUrl)
+    for (const lane of project.lanes) for (const clip of lane.clips) if (clip.sourceUrl) urls.add(clip.sourceUrl)
     const entries = await Promise.all([...urls].map(async (u) => [u, await decodeStem(u)] as const))
     return new Map(entries)
   }
 
   function toScheduledClips(project: TimelineProject, buffers: Map<string, AudioBuffer>): ScheduledClip[] {
     const clips: ScheduledClip[] = []
+    const anySolo = project.lanes.some(lane => lane.clips.some(c => c.solo))
+
     project.lanes.forEach((lane, laneIndex) => {
+      const laneClips: ScheduledClip[] = []
+
       for (const clip of lane.clips) {
-        const buffer = buffers.get(clip.sourceUrl)
-        if (buffer) clips.push({ laneIndex, buffer, timelineStart: clip.timelineStart, trimStart: clip.trimStart, trimEnd: clip.trimEnd })
+        if (clip.muted) continue
+        if (anySolo && !clip.solo) continue
+
+        let stretchFactor = 1.0
+        if (clip.warpEnabled && clip.originalBpm) {
+           const bpm = project.bpm || 120
+           stretchFactor = bpm / clip.originalBpm
+        }
+        
+        if (clip.type === 'midi') {
+          laneClips.push({
+            laneIndex,
+            type: 'midi',
+            notes: clip.notes || [],
+            timelineStart: clip.timelineStart,
+            trimStart: clip.trimStart,
+            trimEnd: clip.trimEnd,
+            fadeInDuration: clip.fadeInDuration,
+            fadeOutDuration: clip.fadeOutDuration,
+            stretchFactor,
+            instrument: clip.instrument as OscillatorType
+          })
+          continue
+        }
+
+        let buffer = clip.sourceUrl ? buffers.get(clip.sourceUrl) : undefined
+        if (clip.warpEnabled && clip.originalBpm && clip.sourceUrl) {
+           const bpm = project.bpm || 120
+           const key = `${clip.sourceUrl}_warp_${clip.originalBpm}_${bpm}`
+           if (buffers.has(key)) {
+             buffer = buffers.get(key)
+           }
+        }
+        
+        if (buffer) {
+          laneClips.push({ 
+            laneIndex,
+            type: 'audio',
+            buffer, 
+            timelineStart: clip.timelineStart, 
+            trimStart: clip.trimStart, 
+            trimEnd: clip.trimEnd,
+            fadeInDuration: clip.fadeInDuration,
+            fadeOutDuration: clip.fadeOutDuration,
+            stretchFactor
+          })
+        }
       }
+
+      // Auto-crossfade overlapping clips in this lane
+      laneClips.sort((a, b) => a.timelineStart - b.timelineStart)
+      for (let i = 0; i < laneClips.length - 1; i++) {
+        const c1 = laneClips[i]
+        const c2 = laneClips[i + 1]
+        const c1End = c1.timelineStart + (c1.trimEnd - c1.trimStart) * (c1.stretchFactor || 1.0)
+        
+        if (c1End > c2.timelineStart) {
+          const overlap = c1End - c2.timelineStart
+          // Apply crossfade if user hasn't explicitly set a custom fade duration
+          if (c1.fadeOutDuration == null) c1.fadeOutDuration = overlap
+          if (c2.fadeInDuration == null) c2.fadeInDuration = overlap
+        }
+      }
+
+      clips.push(...laneClips)
     })
     return clips
   }
@@ -68,7 +134,7 @@ export function useTimelineEngine() {
     if (token !== seekToken || !graph) return // superseded by a newer play/seek, or torn down meanwhile
     playback?.stop()
     applySettings(project)
-    playback = scheduleTimeline(graph, toScheduledClips(project, buffers), fromSec, (graph.ctx as AudioContext).currentTime, onEnded)
+    playback = scheduleTimeline(graph, toScheduledClips(project, buffers), fromSec, (graph.ctx as AudioContext).currentTime + 0.05, onEnded)
   }
 
   function stop(): void {
@@ -90,13 +156,13 @@ export function useTimelineEngine() {
     return renderTimeline(clips, laneSettings, project.master, totalDurationSec, sampleRate)
   }
 
-  function getLaneLevel(laneIndex: number): { peak: number; clipping: boolean } {
-    if (!graph || !graph.lanes[laneIndex]) return { peak: 0, clipping: false }
+  function getLaneLevel(laneIndex: number): { peak: number; clipping: boolean; peakL: number; peakR: number } {
+    if (!graph || !graph.lanes[laneIndex]) return { peak: 0, clipping: false, peakL: 0, peakR: 0 }
     return getChannelLevel(graph.lanes[laneIndex])
   }
 
-  function getMasterLevel(): { peak: number; clipping: boolean } {
-    if (!graph) return { peak: 0, clipping: false }
+  function getMasterLevel(): { peak: number; clipping: boolean; peakL: number; peakR: number } {
+    if (!graph) return { peak: 0, clipping: false, peakL: 0, peakR: 0 }
     return getChannelLevel(graph.master)
   }
 

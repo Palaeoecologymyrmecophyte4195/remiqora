@@ -61,23 +61,26 @@ export function disconnectTimelineGraph(graph: TimelineGraph): void {
   disconnectChannel(graph.master)
 }
 
+import type { MidiNote } from './miniMidiPlayer'
+
 export interface ScheduledClip {
   laneIndex: number
-  buffer: AudioBuffer
+  type?: 'audio' | 'midi'
+  buffer?: AudioBuffer
+  notes?: MidiNote[]
   timelineStart: number
   trimStart: number
   trimEnd: number
+  fadeInDuration?: number
+  fadeOutDuration?: number
+  stretchFactor?: number
+  instrument?: OscillatorType
 }
 
 export interface TimelinePlaybackHandle {
   stop(): void
 }
 
-/** Schedules every clip that hasn't finished by playFromSec, all at once,
- * via AudioBufferSourceNode.start(when, offset, duration) - clips starting
- * in the future and clips already "in progress" at playFromSec are both
- * handled by the same branch below, the only difference being the `offset`
- * (and `when`) passed to start(). */
 export function scheduleTimeline(
   graph: TimelineGraph,
   clips: ScheduledClip[],
@@ -86,30 +89,93 @@ export function scheduleTimeline(
   onEnded: () => void,
 ): TimelinePlaybackHandle {
   const ctx = graph.ctx as AudioContext
-  const sources: AudioBufferSourceNode[] = []
+  const sources: (AudioBufferSourceNode | OscillatorNode)[] = []
   const fadeGains: GainNode[] = []
   let lastEnd = -Infinity
   let lastSrc: AudioBufferSourceNode | null = null
 
   for (const clip of clips) {
-    const clipDuration = clip.trimEnd - clip.trimStart
+    const sf = clip.stretchFactor || 1.0
+    const stretchedTrimStart = clip.trimStart * sf
+    const stretchedTrimEnd = clip.trimEnd * sf
+    const clipDuration = stretchedTrimEnd - stretchedTrimStart
     const clipTimelineEnd = clip.timelineStart + clipDuration
-    if (clipDuration <= 0 || clipTimelineEnd <= playFromSec) continue // finished or empty
+    if (clipDuration <= 0 || clipTimelineEnd <= playFromSec) continue
 
     let when: number
     let offset: number
     let duration: number
     if (clip.timelineStart >= playFromSec) {
       when = ctxStartTime + (clip.timelineStart - playFromSec)
-      offset = clip.trimStart
+      offset = stretchedTrimStart
       duration = clipDuration
     } else {
       when = ctxStartTime
-      offset = clip.trimStart + (playFromSec - clip.timelineStart)
+      offset = stretchedTrimStart + (playFromSec - clip.timelineStart)
       duration = clipTimelineEnd - playFromSec
     }
-    // Defensive clamp against the actual decoded buffer, mirroring the
-    // clamp style already used in mixerEngine's playFrom().
+
+    if (clip.type === 'midi' && clip.notes) {
+      // Schedule MIDI notes
+      for (const note of clip.notes) {
+        const noteStart = note.startSec * sf
+        const noteEnd = noteStart + note.durationSec * sf
+        
+        // Note is completely trimmed out
+        if (noteEnd <= stretchedTrimStart || noteStart >= stretchedTrimEnd) continue
+        
+        const noteTimelineStart = clip.timelineStart + (noteStart - stretchedTrimStart)
+        const noteTimelineEnd = clip.timelineStart + (noteEnd - stretchedTrimStart)
+        
+        // Clamp to clip bounds
+        const actualTimelineStart = Math.max(clip.timelineStart, noteTimelineStart)
+        const actualTimelineEnd = Math.min(clipTimelineEnd, noteTimelineEnd)
+        
+        if (actualTimelineEnd <= playFromSec) continue // already played
+        
+        const noteDuration = actualTimelineEnd - actualTimelineStart
+        const noteWhen = actualTimelineStart >= playFromSec 
+          ? ctxStartTime + (actualTimelineStart - playFromSec)
+          : ctxStartTime
+          
+        const actualPlayDuration = actualTimelineStart >= playFromSec
+          ? noteDuration
+          : actualTimelineEnd - playFromSec
+          
+        if (actualPlayDuration <= 0) continue
+
+        const osc = ctx.createOscillator()
+        osc.type = clip.instrument || 'sawtooth'
+        osc.frequency.value = 440 * Math.pow(2, (note.note - 69) / 12)
+        
+        const noteGain = ctx.createGain()
+        // Basic ADSR envelope
+        const att = Math.min(0.01, actualPlayDuration / 2)
+        const rel = Math.min(0.05, actualPlayDuration / 2)
+        noteGain.gain.setValueAtTime(0, noteWhen)
+        noteGain.gain.linearRampToValueAtTime(note.velocity * 0.3, noteWhen + att)
+        noteGain.gain.setValueAtTime(note.velocity * 0.3, Math.max(noteWhen + att, noteWhen + actualPlayDuration - rel))
+        noteGain.gain.linearRampToValueAtTime(0, noteWhen + actualPlayDuration)
+        
+        osc.connect(noteGain)
+        noteGain.connect(graph.lanes[clip.laneIndex].input)
+        
+        osc.start(noteWhen)
+        osc.stop(noteWhen + actualPlayDuration)
+        
+        sources.push(osc)
+        fadeGains.push(noteGain)
+        
+        if (actualTimelineEnd > lastEnd) {
+          lastEnd = actualTimelineEnd
+          lastSrc = osc as unknown as AudioBufferSourceNode
+        }
+      }
+      continue // Skip audio buffer logic
+    }
+
+    if (!clip.buffer) continue
+    
     offset = Math.min(offset, Math.max(0, clip.buffer.duration - 0.001))
     duration = Math.max(0, Math.min(duration, clip.buffer.duration - offset))
     if (duration <= 0) continue
@@ -117,16 +183,40 @@ export function scheduleTimeline(
     const src = ctx.createBufferSource()
     src.buffer = clip.buffer
 
-    // 15ms micro-fade linear ramps to eliminate cut clicks / non-zero crossings
     const fadeGain = ctx.createGain()
-    const fadeTime = Math.min(0.015, duration / 2)
-    if (fadeTime > 0.001) {
-      fadeGain.gain.setValueAtTime(0, when)
-      fadeGain.gain.linearRampToValueAtTime(1, when + fadeTime)
-      fadeGain.gain.setValueAtTime(1, Math.max(when + fadeTime, when + duration - fadeTime))
-      fadeGain.gain.linearRampToValueAtTime(0, when + duration)
+    const inFadeSec = Math.min(Math.max(0.005, clip.fadeInDuration || 0.015), clipDuration / 2)
+    const outFadeSec = Math.min(Math.max(0.005, clip.fadeOutDuration || 0.015), clipDuration / 2)
+
+    const absStart = clip.timelineStart
+    const absFadeInEnd = absStart + inFadeSec
+    const absFadeOutStart = clipTimelineEnd - outFadeSec
+    const absEnd = clipTimelineEnd
+
+    const toCtxTime = (t: number) => ctxStartTime + (t - playFromSec)
+
+    if (playFromSec <= absStart) {
+      fadeGain.gain.setValueAtTime(0, toCtxTime(absStart))
+      fadeGain.gain.linearRampToValueAtTime(1, toCtxTime(absFadeInEnd))
+      fadeGain.gain.setValueAtTime(1, toCtxTime(absFadeOutStart))
+      fadeGain.gain.linearRampToValueAtTime(0, toCtxTime(absEnd))
     } else {
-      fadeGain.gain.setValueAtTime(1, when)
+      let initialGain = 1.0
+      if (playFromSec < absFadeInEnd) {
+        initialGain = (playFromSec - absStart) / inFadeSec
+      } else if (playFromSec > absFadeOutStart) {
+        initialGain = Math.max(0, 1.0 - (playFromSec - absFadeOutStart) / outFadeSec)
+      }
+      fadeGain.gain.setValueAtTime(initialGain, ctxStartTime)
+
+      if (playFromSec < absFadeInEnd) {
+        fadeGain.gain.linearRampToValueAtTime(1, toCtxTime(absFadeInEnd))
+      }
+      if (playFromSec < absFadeOutStart) {
+        fadeGain.gain.setValueAtTime(1, Math.max(ctxStartTime, toCtxTime(absFadeOutStart)))
+      }
+      if (playFromSec < absEnd) {
+        fadeGain.gain.linearRampToValueAtTime(0, Math.max(ctxStartTime, toCtxTime(absEnd)))
+      }
     }
 
     src.connect(fadeGain)
@@ -147,29 +237,16 @@ export function scheduleTimeline(
     stop() {
       for (const src of sources) {
         src.onended = null
-        try {
-          // Legal even for a source scheduled to start in the future but
-          // that hasn't started yet - cancels it before it ever plays.
-          src.stop()
-        } catch {
-          // already stopped/ended - fine
-        }
+        try { src.stop() } catch {}
         src.disconnect()
       }
       for (const g of fadeGains) {
-        try {
-          g.disconnect()
-        } catch {
-          // already disconnected - fine
-        }
+        try { g.disconnect() } catch {}
       }
     },
   }
 }
 
-/** Offline render for export - same graph-building/settings-applying code
- * path as the live preview, at t=0 (no playhead concept needed for a render
- * that always starts from the beginning). */
 export async function renderTimeline(
   clips: ScheduledClip[],
   laneSettings: ChannelSettings[],
@@ -182,25 +259,73 @@ export async function renderTimeline(
   const anySolo = laneSettings.some((s) => s.solo)
   laneSettings.forEach((s, i) => applyLaneSettings(graph, i, s, effectiveLaneGain(s, anySolo)))
   applyMasterSettings(graph, masterSettings)
+  
   for (const clip of clips) {
-    const duration = clip.trimEnd - clip.trimStart
+    const sf = clip.stretchFactor || 1.0
+    const stretchedTrimStart = clip.trimStart * sf
+    const stretchedTrimEnd = clip.trimEnd * sf
+    const duration = stretchedTrimEnd - stretchedTrimStart
+    const clipTimelineEnd = clip.timelineStart + duration
     if (duration <= 0) continue
+
+    if (clip.type === 'midi' && clip.notes) {
+      for (const note of clip.notes) {
+        const noteStart = note.startSec * sf
+        const noteEnd = noteStart + note.durationSec * sf
+        if (noteEnd <= stretchedTrimStart || noteStart >= stretchedTrimEnd) continue
+        
+        const noteTimelineStart = clip.timelineStart + (noteStart - stretchedTrimStart)
+        const noteTimelineEnd = clip.timelineStart + (noteEnd - stretchedTrimStart)
+        
+        const actualTimelineStart = Math.max(clip.timelineStart, noteTimelineStart)
+        const actualTimelineEnd = Math.min(clipTimelineEnd, noteTimelineEnd)
+        
+        const noteDuration = actualTimelineEnd - actualTimelineStart
+        if (noteDuration <= 0) continue
+
+        const osc = ctx.createOscillator()
+        osc.type = 'sawtooth'
+        osc.frequency.value = 440 * Math.pow(2, (note.note - 69) / 12)
+        
+        const noteGain = ctx.createGain()
+        const att = Math.min(0.01, noteDuration / 2)
+        const rel = Math.min(0.05, noteDuration / 2)
+        noteGain.gain.setValueAtTime(0, actualTimelineStart)
+        noteGain.gain.linearRampToValueAtTime(note.velocity * 0.3, actualTimelineStart + att)
+        noteGain.gain.setValueAtTime(note.velocity * 0.3, Math.max(actualTimelineStart + att, actualTimelineStart + noteDuration - rel))
+        noteGain.gain.linearRampToValueAtTime(0, actualTimelineStart + noteDuration)
+        
+        osc.connect(noteGain)
+        noteGain.connect(graph.lanes[clip.laneIndex].input)
+        
+        osc.start(actualTimelineStart)
+        osc.stop(actualTimelineStart + noteDuration)
+      }
+      continue
+    }
+
+    if (!clip.buffer) continue
+    
     const src = ctx.createBufferSource()
     src.buffer = clip.buffer
     const fadeGain = ctx.createGain()
-    const fadeTime = Math.min(0.015, duration / 2)
-    const when = clip.timelineStart
-    if (fadeTime > 0.001) {
-      fadeGain.gain.setValueAtTime(0, when)
-      fadeGain.gain.linearRampToValueAtTime(1, when + fadeTime)
-      fadeGain.gain.setValueAtTime(1, Math.max(when + fadeTime, when + duration - fadeTime))
-      fadeGain.gain.linearRampToValueAtTime(0, when + duration)
-    } else {
-      fadeGain.gain.setValueAtTime(1, when)
-    }
+    
+    const inFadeSec = Math.min(Math.max(0.005, clip.fadeInDuration || 0.015), duration / 2)
+    const outFadeSec = Math.min(Math.max(0.005, clip.fadeOutDuration || 0.015), duration / 2)
+    
+    const absStart = clip.timelineStart
+    const absFadeInEnd = absStart + inFadeSec
+    const absFadeOutStart = clip.timelineStart + duration - outFadeSec
+    const absEnd = clip.timelineStart + duration
+    
+    fadeGain.gain.setValueAtTime(0, absStart)
+    fadeGain.gain.linearRampToValueAtTime(1, absFadeInEnd)
+    fadeGain.gain.setValueAtTime(1, absFadeOutStart)
+    fadeGain.gain.linearRampToValueAtTime(0, absEnd)
+    
     src.connect(fadeGain)
     fadeGain.connect(graph.lanes[clip.laneIndex].input)
-    src.start(when, clip.trimStart, duration)
+    src.start(absStart, stretchedTrimStart, duration)
   }
   return ctx.startRendering()
 }

@@ -73,3 +73,77 @@ button:not(:disabled) {
   opacity: 0;
   overflow: hidden;
 }
+
+/* Custom Range Sliders */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  background: var(--color-border);
+  height: 4px;
+  border-radius: 99px;
+  transition: background 0.2s;
+}
+
+input[type="range"]:hover::-webkit-slider-runnable-track {
+  background: color-mix(in srgb, var(--color-border) 70%, white);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -4px;
+  background-color: var(--color-text);
+  height: 12px;
+  width: 12px;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  transition: transform 0.1s, box-shadow 0.2s, background-color 0.2s;
+}
+
+input[type="range"]:hover::-webkit-slider-thumb {
+  background-color: var(--color-accent1);
+  box-shadow: 0 0 8px var(--color-accent1);
+  transform: scale(1.1);
+}
+
+input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.2);
+  background-color: var(--color-accent2);
+}
+
+input[type="range"]:focus {
+  outline: none;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-dim);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}

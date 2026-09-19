@@ -1,16 +1,20 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import * as stemsApi from '../../api/stems'
 import type { StemsStatus } from '../../api/stems'
+import * as projectsApi from '../../api/projects'
+import { decodeStem, defaultChannelSettings, defaultMasterSettings } from '../../audio/mixerEngine'
+import type { TimelineProject, TimelineLane, Clip } from '../../audio/timelineTypes'
 import WaveformPlayer from './WaveformPlayer.vue'
-import MixerModal from './MixerModal.vue'
 import type { ModelId } from '../../types'
 
 const props = defineProps<{ trackId: number; title: string; lyrics: string; model: ModelId }>()
 const { t } = useI18n()
 
-const mixerOpen = ref(false)
+const router = useRouter()
+const openingEditor = ref(false)
 
 const STEM_ORDER = ['vocals', 'drums', 'bass', 'other'] as const
 const STEM_LABELS = computed<Record<string, string>>(() => ({
@@ -84,6 +88,49 @@ function download(name: string, url: string) {
   a.click()
 }
 
+async function openInEditor() {
+  if (!stemUrls.value) return
+  openingEditor.value = true
+  error.value = null
+  try {
+    const lanes: TimelineLane[] = []
+    for (const name of STEM_ORDER) {
+      if (stemUrls.value[name]) {
+        const buffer = await decodeStem(stemUrls.value[name])
+        const clip: Clip = {
+          id: crypto.randomUUID(),
+          sourceUrl: stemUrls.value[name],
+          sourceLabel: `${props.title} — ${STEM_LABELS.value[name]}`,
+          timelineStart: 0,
+          trimStart: 0,
+          trimEnd: buffer.duration,
+          originalBpm: 120,
+        }
+        lanes.push({
+          id: crypto.randomUUID(),
+          name: STEM_LABELS.value[name],
+          settings: defaultChannelSettings(),
+          clips: [clip],
+        })
+      }
+    }
+    const project: TimelineProject = {
+      version: 1,
+      lanes,
+      master: defaultMasterSettings(),
+      pxPerSecond: 40,
+      bpm: 120,
+      snapEnabled: false,
+    }
+    const created = await projectsApi.createProject(props.title, project)
+    await router.push(`/editor/${created.id}`)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    openingEditor.value = false
+  }
+}
+
 onMounted(async () => {
   try {
     applyStatus(await stemsApi.getSeparationStatus(props.trackId))
@@ -137,20 +184,12 @@ onBeforeUnmount(clearPoll)
         </div>
         <div class="flex gap-2">
           <button type="button" class="accent-gradient rounded-lg px-2.5 py-1 text-xs font-medium text-white" @click="start(true)">{{ t('stemsPanel.recreate') }}</button>
-          <button type="button" class="rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-text" @click="mixerOpen = true">{{ t('stemsPanel.mixer') }}</button>
+          <button type="button" class="rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-text" :disabled="openingEditor" @click="openInEditor">
+            {{ openingEditor ? '...' : t('mixer.openInEditor') }}
+          </button>
           <button type="button" class="rounded-lg border border-status-failed/40 px-2.5 py-1 text-xs font-medium text-status-failed" @click="removeStems">{{ t('stemsPanel.delete') }}</button>
         </div>
       </div>
     </div>
-
-    <MixerModal
-      v-if="mixerOpen && stemUrls"
-      :track-id="trackId"
-      :stem-urls="stemUrls"
-      :title="title"
-      :lyrics="lyrics"
-      :model="model"
-      @close="mixerOpen = false"
-    />
   </div>
 </template>

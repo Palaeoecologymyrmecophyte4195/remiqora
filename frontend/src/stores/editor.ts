@@ -10,8 +10,14 @@ const t = i18n.global.t
 
 const DEFAULT_PX_PER_SECOND = 40
 
+import { TRACK_COLORS } from '../utils/trackColors'
+
+let laneColorIndex = 0
+
 function newLane(name: string): TimelineLane {
-  return { id: crypto.randomUUID(), name, clips: [], settings: defaultChannelSettings() }
+  const colorId = TRACK_COLORS[laneColorIndex % TRACK_COLORS.length].id
+  laneColorIndex++
+  return { id: crypto.randomUUID(), name, clips: [], settings: defaultChannelSettings(), colorId }
 }
 
 function emptyProject(): TimelineProject {
@@ -20,6 +26,9 @@ function emptyProject(): TimelineProject {
     lanes: [newLane(t('storeErrors.defaultLane', { n: 1 })), newLane(t('storeErrors.defaultLane', { n: 2 }))],
     master: defaultMasterSettings(),
     pxPerSecond: DEFAULT_PX_PER_SECOND,
+    bpm: 120,
+    snapEnabled: true,
+    loopRegion: { start: 0, end: 10, enabled: false },
   }
 }
 
@@ -31,6 +40,7 @@ export const useEditorStore = defineStore('editor', {
     playheadSec: 0,
     playing: false,
     selectedClipId: null as string | null,
+    selectedLaneId: null as string | null,
     dirty: false,
     loading: false,
     saving: false,
@@ -78,6 +88,7 @@ export const useEditorStore = defineStore('editor', {
       this.playheadSec = 0
       this.playing = false
       this.selectedClipId = null
+      this.selectedLaneId = null
       this.history = [JSON.stringify(this.project)]
       this.historyIndex = 0
       this.dirty = false
@@ -94,6 +105,7 @@ export const useEditorStore = defineStore('editor', {
         this.playheadSec = 0
         this.playing = false
         this.selectedClipId = null
+        this.selectedLaneId = null
         this.history = [JSON.stringify(this.project)]
         this.historyIndex = 0
         this.dirty = false
@@ -132,7 +144,15 @@ export const useEditorStore = defineStore('editor', {
     },
     removeLane(laneId: string) {
       this.project.lanes = this.project.lanes.filter((l) => l.id !== laneId)
+      if (this.selectedLaneId === laneId) this.selectedLaneId = null
       this.snapshot()
+    },
+    updateLaneColor(laneId: string, colorId: string) {
+      const lane = this.project.lanes.find((l) => l.id === laneId)
+      if (lane) {
+        lane.colorId = colorId
+        this.snapshot()
+      }
     },
     addClip(laneId: string, clip: Clip) {
       const lane = this.project.lanes.find((l) => l.id === laneId)
@@ -179,6 +199,30 @@ export const useEditorStore = defineStore('editor', {
     },
     setZoom(pxPerSecond: number) {
       this.project.pxPerSecond = Math.max(5, Math.min(400, pxPerSecond))
+    },
+    setBpm(bpm: number) {
+      this.project.bpm = Math.max(20, Math.min(999, bpm))
+      this.snapshot()
+    },
+    toggleSnap() {
+      this.project.snapEnabled = !this.project.snapEnabled
+      this.snapshot()
+    },
+    toggleLoop() {
+      if (!this.project.loopRegion) {
+        this.project.loopRegion = { start: 0, end: 10, enabled: true }
+      } else {
+        this.project.loopRegion.enabled = !this.project.loopRegion.enabled
+      }
+      this.snapshot()
+    },
+    setLoopRegion(start: number, end: number) {
+      if (this.project.loopRegion) {
+        this.project.loopRegion.start = Math.max(0, start)
+        this.project.loopRegion.end = Math.max(start + 0.1, end)
+      } else {
+        this.project.loopRegion = { start: Math.max(0, start), end: Math.max(start + 0.1, end), enabled: true }
+      }
     },
   },
 })
