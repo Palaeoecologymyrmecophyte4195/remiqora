@@ -47,8 +47,8 @@ ACE-Step and YuE2 are two independent music generation engines, each with its ow
 
 - **One UI** instead of two different interfaces with different UX.
 - **Mutually-exclusive orchestrator**: pick a model in the header — it starts up, and the other one stops on its own. No need to manually kill processes before starting the other engine.
-- **Shared storage**: every track (generated, uploaded, or assembled in the editor) is tracked in a centralized SQLite database and shared folder, available from every module — Demucs, MuScriptor, the mixer and the editor all work off the same library instead of three separate ones.
-- **A DAW on top of generation**: a generated track isn't the end point, it's raw material — split it into stems, mix it down, drag it onto a timeline, blend it with other tracks, and export.
+- **Shared storage**: every track (generated, uploaded, or assembled in the editor) is tracked in a centralized SQLite database and shared folder, available from every module — Demucs, MuScriptor and the editor all work off the same library instead of three separate ones.
+- **A DAW on top of generation**: a generated track isn't the end point, it's raw material — split it into stems, drag it onto a timeline, process it with effects, blend it with other tracks, and export.
 - **Built-in LoRA training**: not just generation — fine-tune ACE-Step on your own voice or style right from the browser, no console needed.
 
 ---
@@ -63,7 +63,7 @@ ACE-Step and YuE2 are two independent music generation engines, each with its ow
 | **LoRA training** | Dataset → auto-labeling → preprocessing → training → export — the whole ACE-Step fine-tuning pipeline for your own voice/style, in the browser. |
 | **Demucs** | Splits any track into 4 stems: vocals, drums, bass, other. |
 | **MuScriptor** | Transcribes audio (the full mix or a single stem) into MIDI notes. |
-| **Built-in DAW** | A multitrack timeline editor for assembling tracks/stems into a final mix. |
+| **Built-in DAW** | A multitrack timeline editor for assembling tracks/stems into a final mix: an effects rack on every channel, auto-BPM and time-stretch, WAV/MP3 export. |
 
 The interface is fully bilingual (Russian/English, switcher in the header).
 
@@ -109,7 +109,7 @@ The full ACE-Step fine-tuning pipeline on your own dataset, no console required:
 
 ![Stem separation](docs/screenshots/en/05-stems-panel.png)
 
-One click splits any saved track into 4 isolated stems (Demucs `htdemucs`), with a progress bar, a separate player and download per stem, and the option to redo or delete. Runs alongside the active generation model (without stopping it), sharing a GPU lock.
+One click splits any saved track into 4 isolated stems (Demucs `htdemucs`), with a progress bar, a separate player and download per stem, and the option to redo or delete. Runs alongside the active generation model (without stopping it), sharing a GPU lock. The **"Open in editor"** button allows you to instantly send all 4 stems into a new built-in DAW project for further mixdown.
 
 ## MIDI transcription (MuScriptor)
 
@@ -117,24 +117,38 @@ One click splits any saved track into 4 isolated stems (Demucs `htdemucs`), with
 
 Transcribes the full mix, or any already-separated stem, into MIDI. Technically this isn't a separate process — it's a model loaded into the already-running YuE2 server, so **transcription requires YuE2 to be the active model**. Result: a built-in Web Audio synth player, a mini piano roll, a note count and BPM readout, and `.mid` download.
 
-## Mixer
-
-![Stem mixer](docs/screenshots/en/09-mixer.png)
-
-A fixed 4-channel console (vocals/drums/bass/other + master) for a quick stem mixdown: volume, pan, mute/solo, a 3-band EQ, a compressor, reverb, and VU meters with clipping indication. Settings are saved automatically. The **"Open in editor"** button carries all 4 stems with their current settings into a new full-DAW project — the mixer is meant as a quick preview, the editor as its superset.
-
 ## Built-in DAW
 
-![Editor with a clip on the timeline](docs/screenshots/en/08-editor-with-clip.png)
+![Editor: a four-stem project on the timeline](docs/screenshots/en/08-editor-with-clip.png)
 
-Any number of tracks, onto which you can add anything from the shared library (a full mix, a single stem, a file uploaded from disk) — via a picker dialog or by dragging a file straight onto a track.
+Any number of tracks, onto which you can add anything from the shared library (a full mix, a single stem, a file uploaded from disk) — via a picker dialog or by dragging a file straight onto a track. The quickest way in is through stems: the **"Open in editor"** button on the stems panel creates a ready-made four-track project (vocals, drums, bass, other).
 
-- Free clip repositioning and edge trimming (non-destructive — the source file is untouched), with magnetic snapping to neighboring clips and to timeline zero.
-- **Undo/Redo** (Ctrl+Z / Ctrl+Y) — up to **30 steps** of history.
-- Hotkeys: `Space` — play/pause, `Delete` — remove clip, `Ctrl+D` — duplicate, `Ctrl+wheel` — zoom.
-- Guards against losing unsaved edits when closing the tab or navigating away.
-- **Micro-fades**: automatic 15 ms linear ramps at each clip's edges — remove digital clicks from hard cuts.
-- VU meters with clipping on every track and the master bus; the same channel strip (EQ/compressor/reverb) as the mixer.
+### Timeline and clips
+
+- Free clip repositioning and edge trimming (non-destructive — the source file is untouched). Clips always snap to neighboring clips' edges and to timeline zero; the **Magnet** button additionally snaps to a grid derived from the project BPM (the step depends on zoom: 1/16, 1/8, 1/4 note, or a bar).
+- **Split a clip** at the cursor (`S`), duplicate (`Ctrl+D`), delete (`Delete`).
+- Buttons on the clip itself: **M** (mute), **S** (solo), **W** (warp) and ✕. Draggable **fade-in / fade-out** handles sit on the clip's edges; by default each edge gets an automatic 15 ms micro-fade that removes digital clicks from hard cuts.
+- **Loop**: a loop region on the time ruler — drag it whole or pull either edge; clicking the ruler seeks.
+- **BPM and Warp**: when a clip is added from the library or dragged in from disk, its tempo is detected automatically (from the first 30 seconds). The **BPM** field sets the project tempo, and the **W** button time-stretches the clip to it (SoundTouch) while preserving pitch. The detector is a simple one and can be off on complex material.
+- **Undo/Redo** (`Ctrl+Z` / `Ctrl+Y`) — up to **30 steps** of history. Zoom with `Ctrl+wheel` or the slider and **Fit** button; pan the timeline with `Shift+drag` or the middle mouse button.
+
+### Channels and effects
+
+![Effects rack on the vocals channel](docs/screenshots/en/10-editor-effects.png)
+
+- Every track has volume, pan, mute/solo, and a color (the dots above the track list), plus a shared master bus.
+- **An 8-effect rack** on every channel and on the master: EQ (Low/Mid/High, ±12 dB), Dynamics (compressor: threshold and ratio), Filter (LP/HP: frequency and resonance), Chorus, Delay, Reverb, Distortion, and Bitcrush. All effects run in real time, with parameter values shown next to the sliders.
+- Stereo master VU meters (L/R) in the toolbar, and a level meter with clipping indication in the selected track's channel.
+
+### Help
+
+![Built-in editor help](docs/screenshots/en/11-editor-help.png)
+
+The **"?"** button in the toolbar opens built-in help: a list of hotkeys, mouse controls, and short tips on Loop and Magnet.
+
+### Project and export
+
+- Projects are stored on the server and opened from a list. There is no autosave — use the **Save** button; if you close the tab or navigate away with unsaved edits, the editor warns you about losing them.
 - Export the mixed-down project as **WAV** or **MP3** — rendered offline (the same processing graph as live playback) and saved back into the shared track library.
 
 ---
