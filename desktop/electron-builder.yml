@@ -1,0 +1,54 @@
+appId: io.github.inikolax.remiqora
+productName: Remiqora
+copyright: Copyright © 2026 Nikolay Cherkashin
+directories:
+  output: dist
+  buildResources: build
+publish: null
+
+files:
+  - src/**
+  - renderer/**
+  - manifest.json
+  - package.json
+  - "!**/*.map"
+
+# The backend runs from real files (Python cannot import from an asar archive). Its own sibling layout is kept:
+# resources/backend and resources/frontend/dist.
+extraResources:
+  - from: resources/backend
+    to: backend
+  - from: resources/frontend
+    to: frontend
+  - from: resources/patches
+    to: patches
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.png
+nsis:
+  oneClick: true            # per-user install, no administrator prompt
+  perMachine: false
+  deleteAppDataOnUninstall: false   # models and projects are the user's data, not ours to delete
+  artifactName: Remiqora-Setup-${version}.${ext}
+  shortcutName: Remiqora
+
+mac:
+  target:
+    - target: dmg
+      arch: [arm64]
+    - target: zip
+      arch: [arm64]
+  category: public.app-category.music
+  icon: build/icon.png
+  identity: null            # unsigned until an Apple Developer ID is set up
+  artifactName: Remiqora-${version}-${arch}.${ext}
+
+# Packaging works; the first-run setup reports "unsupported" on Linux until it has scripts (see PR #2).
+linux:
+  target: [AppImage]
+  category: AudioVideo
+  icon: build/icon.png
+  artifactName: Remiqora-${version}-${arch}.${ext}

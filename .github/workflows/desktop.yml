@@ -1,0 +1,68 @@
+name: Desktop app
+
+# Builds the Electron installers. Nothing is published from here: the artifacts are
+# for testing until the installers are signed.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+  pull_request:
+    branches: [master]
+    paths:
+      - "desktop/**"
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/desktop.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Package (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            artifacts: |
+              desktop/dist/*.exe
+          - name: macOS (Apple Silicon)
+            os: macos-latest
+            artifacts: |
+              desktop/dist/*.dmg
+              desktop/dist/*.zip
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            desktop/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+      - name: Install desktop dependencies
+        run: npm ci
+        working-directory: desktop
+      - name: Unit tests
+        run: npm test
+        working-directory: desktop
+      - name: Build installer
+        run: npm run dist
+        working-directory: desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: remiqora-${{ runner.os }}
+          path: ${{ matrix.artifacts }}
+          if-no-files-found: error
