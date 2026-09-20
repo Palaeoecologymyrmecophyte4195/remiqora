@@ -288,7 +288,7 @@
 
   (async function init() {
     ctx = await api.context();
-    locale = String(ctx.locale).toLowerCase().startsWith('ru') ? 'ru' : 'en';
+    locale = ctx.languages.some((lang) => String(lang).toLowerCase().startsWith('ru')) ? 'ru' : 'en';
     document.documentElement.lang = locale;
     api.onEvent(onEvent);
     if (params.get('state') === 'crashed') return showCrashed(params.get('message') || '');

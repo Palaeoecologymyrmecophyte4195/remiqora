@@ -112,7 +112,8 @@ function registerIpc() {
     return {
       version: app.getVersion(),
       platform: PLATFORM,
-      locale: app.getLocale(),
+      // Every preferred language, like the app itself: Russian anywhere in the list selects Russian.
+      languages: [app.getLocale(), ...app.getPreferredSystemLanguages()],
       dataRoot: ctx.L.root,
       plan,
       totalBytes: plan.reduce((sum, c) => sum + c.weight, 0),
