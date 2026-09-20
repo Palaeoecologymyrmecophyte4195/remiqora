@@ -187,11 +187,14 @@ MODELS: dict[str, ModelDefinition] = {
     ),
 }
 
-LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+# The desktop app (desktop/) points these two at the user's profile because its
+# install directory is read-only; a source checkout keeps the defaults next to
+# the backend.
+LOG_DIR = _env_path("REMIQORA_LOG_DIR", str(Path(__file__).resolve().parent.parent / "logs"))
 LOG_TAIL_LINES = 40
 
 # Shared track storage: one SQLite DB + files split into a subfolder per model.
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+DATA_DIR = _env_path("REMIQORA_DATA_DIR", str(Path(__file__).resolve().parent.parent / "data"))
 
 # Directory containing the built frontend (frontend/dist). Only used when it
 # exists; in dev the Vite dev server is used instead and this is ignored.
