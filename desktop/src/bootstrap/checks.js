@@ -1,14 +1,16 @@
 'use strict';
 const { execFile } = require('node:child_process');
+const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const { IS_WINDOWS } = require('../paths');
 
-/** Runs a command, never rejects: { ok, stdout }. */
-function run(cmd, args, timeout = 8000) {
+/** Runs a command, never rejects: { ok, stdout, timedOut }. */
+function run(cmd, args, timeout = 5000) {
   return new Promise((resolve) => {
-    execFile(cmd, args, { timeout, windowsHide: true }, (err, stdout) => resolve({ ok: !err, stdout: String(stdout || '') }));
+    execFile(cmd, args, { timeout, windowsHide: true }, (err, stdout) =>
+      resolve({ ok: !err, stdout: String(stdout || ''), timedOut: !!(err && err.killed) }));
   });
 }
 
@@ -27,9 +29,12 @@ function nvidiaSmiCandidates() {
 /** First NVIDIA GPU as { name, driver, vramMiB, computeCap } or null. */
 async function detectNvidiaGpu() {
   for (const smi of nvidiaSmiCandidates()) {
+    if (path.isAbsolute(smi) && !fs.existsSync(smi)) continue;
     // compute_cap needs a fairly recent driver; fall back to the fields every driver has.
     for (const fields of ['name,driver_version,memory.total,compute_cap', 'name,driver_version,memory.total']) {
       const r = await run(smi, [`--query-gpu=${fields}`, '--format=csv,noheader,nounits']);
+      // A hung driver query would hang again on the next candidate (usually the same binary): give up at once.
+      if (r.timedOut) return null;
       const line = r.ok ? r.stdout.split(/\r?\n/).find((l) => l.trim()) : null;
       if (!line) continue;
       const [name, driver, vram, cap] = line.split(',').map((s) => s.trim());
@@ -89,8 +94,14 @@ async function runChecks({ platform, dataRoot, manifest, fetchImpl = fetch }) {
     fail('unsupported-platform', { platform });
   }
 
+  // Independent, so they run side by side: the screen waits for the slowest, not for the sum.
+  const [gpu, free, online] = await Promise.all([
+    platform === 'win32-x64' ? detectNvidiaGpu() : Promise.resolve(null),
+    freeBytes(dataRoot),
+    isOnline(fetchImpl),
+  ]);
+
   if (platform === 'win32-x64') {
-    const gpu = await detectNvidiaGpu();
     const verdict = evaluateGpu(gpu, req);
     items.push({ id: 'gpu', ok: verdict.code !== 'no-gpu' && verdict.code !== 'old-gpu', name: gpu ? gpu.name : '', vramMiB: gpu ? gpu.vramMiB : 0 });
     items.push({ id: 'driver', ok: verdict.code !== 'old-driver' && !!gpu, driver: gpu ? gpu.driver : '', required: req.minDriver });
@@ -99,12 +110,10 @@ async function runChecks({ platform, dataRoot, manifest, fetchImpl = fetch }) {
     items.push({ id: 'gpu', ok: true, name: 'Apple Silicon', vramMiB: Math.round(os.totalmem() / 2 ** 20) });
   }
 
-  const free = await freeBytes(dataRoot);
   const enoughDisk = free >= req.minFreeBytes;
   items.push({ id: 'disk', ok: enoughDisk, freeBytes: free, requiredBytes: req.minFreeBytes });
   if (!enoughDisk) fail('no-disk', { free, required: req.minFreeBytes });
 
-  const online = await isOnline(fetchImpl);
   items.push({ id: 'network', ok: online });
   if (!online) fail('offline');
 
