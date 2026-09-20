@@ -61,6 +61,8 @@ function layout(root, platform = PLATFORM, manifest = null) {
     ffmpegDir: path.join(root, 'tools', 'ffmpeg'),
     pythonDir: path.join(root, 'tools', 'python'),
     uvCache: path.join(root, 'cache', 'uv'),
+    hfHome: path.join(root, 'cache', 'huggingface'),
+    torchHome: path.join(root, 'cache', 'torch'),
     downloads: path.join(root, 'cache', 'downloads'),
     aceStep: path.join(root, 'engines', 'ACE-Step-1.5'),
     yue2,

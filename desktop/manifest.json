@@ -4,7 +4,7 @@
   "requirements": {
     "minDriver": 580,
     "minComputeCapability": 7.5,
-    "minFreeBytes": 30000000000
+    "minFreeBytes": 50000000000
   },
   "uv": {
     "version": "0.12.17",
@@ -81,13 +81,28 @@
   "aceStep": {
     "commit": "ca1e85fe9430179831e6bc6be790c332190a3866",
     "url": "https://github.com/ace-step/ACE-Step-1.5/archive/ca1e85fe9430179831e6bc6be790c332190a3866.tar.gz",
-    "approxBytes": 3500000000
+    "approxBytes": 8500000000
   },
   "demucs": {
-    "approxBytes": 2500000000
+    "approxBytes": 4500000000,
+    "model": "htdemucs"
   },
   "weights": {
-    "packages": ["yue2_main_q8_0", "yue2_main_q4_0", "yue2_vae_f16", "sheetsage2_orig", "muscriptor_small_f32"],
-    "approxBytes": 10000000000
+    "packages": [
+      "yue2_main_q8_0",
+      "yue2_main_q4_0",
+      "yue2_vae_f16",
+      "sheetsage2_orig",
+      "muscriptor_small_f32"
+    ],
+    "approxBytes": 10300000000
+  },
+  "aceModels": {
+    "approxBytes": 9400000000,
+    "requiredFolders": [
+      "acestep-v15-turbo",
+      "acestep-5Hz-lm-1.7B",
+      "vae"
+    ]
   }
 }

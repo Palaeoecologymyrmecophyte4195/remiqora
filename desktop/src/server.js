@@ -31,6 +31,8 @@ function backendEnv({ L, manifest, platform }) {
     UV_CACHE_DIR: L.uvCache,
     UV_PYTHON_INSTALL_DIR: L.pythonDir,
     UV_PYTHON_PREFERENCE: 'only-managed',
+    HF_HOME: L.hfHome,
+    TORCH_HOME: L.torchHome,
     UV_NO_PROGRESS: '1',
     PYTHONUTF8: '1',
     ACE_STEP_DIR: L.aceStep,

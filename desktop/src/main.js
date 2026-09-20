@@ -102,15 +102,17 @@ async function startSetup() {
 }
 
 function registerIpc() {
-  ipcMain.handle('setup:context', async () => ({
-    version: app.getVersion(),
-    platform: PLATFORM,
-    locale: app.getLocale(),
-    dataRoot: ctx.L.root,
-    plan: await describePlan(ctx),
-    totalBytes: Math.round(manifest.weights.approxBytes + manifest.aceStep.approxBytes + manifest.demucs.approxBytes) +
-      (manifest.engine.assets[PLATFORM] ? manifest.engine.assets[PLATFORM].files.reduce((a, f) => a + f.bytes, 0) : 0),
-  }));
+  ipcMain.handle('setup:context', async () => {
+    const plan = await describePlan(ctx);
+    return {
+      version: app.getVersion(),
+      platform: PLATFORM,
+      locale: app.getLocale(),
+      dataRoot: ctx.L.root,
+      plan,
+      totalBytes: plan.reduce((sum, c) => sum + c.weight, 0),
+    };
+  });
   ipcMain.handle('setup:checks', (_e, dataRoot) => runChecks({ platform: PLATFORM, dataRoot: dataRoot || ctx.L.root, manifest }));
   ipcMain.handle('setup:choose-folder', async () => {
     const r = await dialog.showOpenDialog(win, { properties: ['openDirectory', 'createDirectory'] });

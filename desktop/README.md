@@ -21,6 +21,8 @@ The frontend is unchanged: it uses relative `/api/...` URLs and the backend serv
 | macOS, Apple Silicon | packaged and set up by the same code, **not tested**; needs FFmpeg from Homebrew |
 | Linux | packaging config exists, the first-run screen reports "not supported" until there are setup scripts (PR #2) |
 
+Plan for about 35 GB of disk (measured: a full first run plus one generation) and a download of roughly 30 GB; the first-run screen asks for at least 50 GB free.
+
 The Windows requirement comes from the prebuilt engine: the upstream `audio.cpp` CUDA 13.3 build (compute capability
 7.5 or newer, driver 580 or newer). No CUDA Toolkit, Visual Studio Build Tools or compiler is needed.
 
@@ -62,12 +64,13 @@ Everything lives under the chosen folder, so removing it removes the app's data:
 | `tools/ffmpeg` | FFmpeg (Windows) | Gyan builds, pinned |
 | `engines/YuE2` | `audiocpp_server`, CUDA/Metal libraries, model downloader | audio.cpp release, pinned |
 | `engines/ACE-Step-1.5` | ACE-Step at the pinned commit with `external/patches/ace-step.patch` applied, plus its `uv sync` environment | GitHub source archive |
+| `engines/ACE-Step-1.5/checkpoints` | ACE-Step generation models (~9.4 GB), fetched with `acestep-download` so the first generation does not stall | Hugging Face |
 | `engines/Demucs` | a uv project with Demucs and CUDA torch | PyPI / PyTorch index |
 | `backend-venv` | the environment the Remiqora backend runs in | PyPI |
 | `data`, `logs` | database, generated audio, logs | created at run time |
 | `engines/YuE2/models` | YuE2, SheetSage2 and MuScriptor weights (~10 GB) | audio.cpp model manager |
 
-ACE-Step's own checkpoints are fetched by `acestep-api` on the first generation, as before.
+Model caches (`HF_HOME`, `TORCH_HOME`) are redirected into `cache/` under the same folder, so nothing large lands in the user profile.
 
 The pinned versions and their SHA-256 hashes are in [`manifest.json`](manifest.json). To bump one, read the hash from
 the release (`gh api repos/OWNER/REPO/releases/tags/TAG --jq '.assets[] | "\(.name) \(.digest)"'`), update the URL,
@@ -86,6 +89,16 @@ its files are still on disk, so a new app version with new pins downloads just w
 | `REMIQORA_USER_DATA` | Electron user-data folder, to isolate the saved settings |
 | `REMIQORA_SKIP_COMPONENTS` | comma-separated ids to skip, e.g. `ace-step,demucs,weights` for a quick run |
 | `REMIQORA_DEVTOOLS` | open DevTools when running from source |
+
+### Full end-to-end test
+
+`test/e2e/full.js` drives an installed build through everything a user does: a first run with every component, then
+a YuE2 track, MIDI, an ACE-Step track, Demucs stems, a clean quit and a restart with the tracks still there. It needs
+Windows, an NVIDIA GPU, about 46 GB and 25 minutes, and runs against a folder you choose, never real data. The header
+of the file has the commands; it uses Playwright's Electron support (`npm i --no-save playwright`).
+
+Last run (2026-09-20, RTX 4080): first run 12 min, YuE2 20 s of audio in 5 s, ACE-Step 12 s clip in 50 s, Demucs 10 s,
+closing the window with ACE-Step running ended all 10 processes in 1.8 s, and both torch environments reported CUDA.
 
 `npm test` runs the unit tests (downloader with resume, retry and hash checks, the JS patcher, system checks and the
 setup runner) with Node's built-in runner.

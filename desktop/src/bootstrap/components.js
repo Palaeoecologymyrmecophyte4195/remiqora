@@ -16,7 +16,7 @@ const sha1 = (text) => crypto.createHash('sha1').update(text).digest('hex').slic
 /** Environment for uv: everything (Python, wheel cache) stays under the data root the user chose. */
 function uvEnv(L) {
   // only-managed: never bind the venvs to a system Python that the user may later remove or upgrade.
-  return cleanEnv({ UV_CACHE_DIR: L.uvCache, UV_PYTHON_INSTALL_DIR: L.pythonDir, UV_PYTHON_PREFERENCE: 'only-managed', UV_NO_PROGRESS: '1', NO_COLOR: '1', PYTHONUTF8: '1' });
+  return cleanEnv({ UV_CACHE_DIR: L.uvCache, UV_PYTHON_INSTALL_DIR: L.pythonDir, UV_PYTHON_PREFERENCE: 'only-managed', HF_HOME: L.hfHome, TORCH_HOME: L.torchHome, UV_NO_PROGRESS: '1', NO_COLOR: '1', PYTHONUTF8: '1' });
 }
 
 async function dirSize(dir) {
@@ -28,6 +28,23 @@ async function dirSize(dir) {
     total += e.isDirectory() ? await dirSize(p) : (await fsp.stat(p).catch(() => ({ size: 0 }))).size;
   }
   return total;
+}
+
+/**
+ * `uv sync` reports no byte counts, but everything it downloads lands in the wheel cache, so the growth of that
+ * folder is an honest progress signal. Capped below 100% because the estimate can only be approximate.
+ */
+async function withCacheGrowth(dir, total, report, task) {
+  const baseline = await dirSize(dir);
+  const timer = setInterval(async () => {
+    const grown = Math.max(0, (await dirSize(dir)) - baseline);
+    report({ done: Math.min(grown, total * 0.98), total });
+  }, 3000);
+  try {
+    return await task();
+  } finally {
+    clearInterval(timer);
+  }
 }
 
 /** Downloads one manifest file into the downloads cache and reports byte progress offset by `base`. */
@@ -180,7 +197,24 @@ function buildComponents({ L, manifest, platform, resources }) {
         await fsp.rename(tmp, L.aceStep);
         await fsp.rm(archive, { force: true });
       }
-      await runCommand(L.uvBin, ['sync'], { cwd: L.aceStep, env: uvEnv(L), onLine: (line) => report({ note: line }), signal: ctx.signal, logFile });
+      await withCacheGrowth(L.uvCache, manifest.aceStep.approxBytes, report, () =>
+        runCommand(L.uvBin, ['sync'], { cwd: L.aceStep, env: uvEnv(L), onLine: (line) => report({ note: line }), signal: ctx.signal, logFile }));
+    },
+  };
+
+  // ACE-Step downloads its models on the first generation; doing it here keeps the first "Generate" instant.
+  const aceModels = {
+    id: 'ace-models',
+    weight: manifest.aceModels.approxBytes,
+    version: 'ace-main-model-v1',
+    verify: async () => {
+      for (const folder of manifest.aceModels.requiredFolders) if (!(await exists(path.join(L.aceStep, 'checkpoints', folder)))) return false;
+      return true;
+    },
+    async install(ctx, report) {
+      const checkpoints = path.join(L.aceStep, 'checkpoints');
+      await withCacheGrowth(checkpoints, manifest.aceModels.approxBytes, report, () =>
+        runCommand(L.uvBin, ['run', 'acestep-download'], { cwd: L.aceStep, env: uvEnv(L), onLine: (line) => report({ note: line }), signal: ctx.signal, logFile }));
     },
   };
 
@@ -192,7 +226,11 @@ function buildComponents({ L, manifest, platform, resources }) {
     async install(ctx, report) {
       await fsp.mkdir(L.demucs, { recursive: true });
       await fsp.writeFile(path.join(L.demucs, 'pyproject.toml'), demucsProject(platform));
-      await runCommand(L.uvBin, ['sync'], { cwd: L.demucs, env: uvEnv(L), onLine: (line) => report({ note: line }), signal: ctx.signal, logFile });
+      await withCacheGrowth(L.uvCache, manifest.demucs.approxBytes, report, () =>
+        runCommand(L.uvBin, ['sync'], { cwd: L.demucs, env: uvEnv(L), onLine: (line) => report({ note: line }), signal: ctx.signal, logFile }));
+      // Fetch the separation model now (about 80 MB), so the first "split into stems" does not stall on a download.
+      const fetchModel = `from demucs.pretrained import get_model; get_model('${manifest.demucs.model}')`;
+      await runCommand(L.uvBin, ['run', 'python', '-c', fetchModel], { cwd: L.demucs, env: uvEnv(L), onLine: (line) => report({ note: line }), signal: ctx.signal, logFile });
     },
   };
 
@@ -218,7 +256,7 @@ function buildComponents({ L, manifest, platform, resources }) {
   };
 
   // Order matters: the backend venv provides the Python that runs the weights downloader.
-  return [uv, ffmpeg, engineStep, backendEnv, aceStep, demucs, weights];
+  return [uv, ffmpeg, engineStep, backendEnv, aceStep, aceModels, demucs, weights];
 }
 
 /** Path of ffmpeg: bundled on Windows, taken from the system on macOS (Homebrew), where no pinned static build exists. */

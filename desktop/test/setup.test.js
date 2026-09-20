@@ -90,7 +90,7 @@ test('the real plan has every component, in dependency order', () => {
   const L = layout(tmp(), 'win32-x64', manifest);
   const resources = { backend: path.join(__dirname, '..', '..', 'backend'), acePatch: path.join(__dirname, '..', '..', 'external', 'patches', 'ace-step.patch') };
   const ids = buildComponents({ L, manifest, platform: 'win32-x64', resources }).map((c) => c.id);
-  assert.deepEqual(ids, ['uv', 'ffmpeg', 'engine', 'backend-env', 'ace-step', 'demucs', 'weights']);
+  assert.deepEqual(ids, ['uv', 'ffmpeg', 'engine', 'backend-env', 'ace-step', 'ace-models', 'demucs', 'weights']);
 });
 
 test('Demucs gets the CUDA torch index off macOS only', () => {
@@ -104,6 +104,8 @@ test('the backend environment points every path at the data root', () => {
   assert.equal(env.REMIQORA_DATA_DIR, L.data);
   assert.equal(env.REMIQORA_LOG_DIR, L.logs);
   assert.equal(env.YUE2_DIR, L.yue2);
+  assert.equal(env.HF_HOME, L.hfHome, 'model caches stay inside the chosen folder');
+  assert.equal(env.TORCH_HOME, L.torchHome);
   assert.equal(env.CUDA_BIN_DIR, L.yue2Bin);
   assert.ok(env.PATH.split(path.delimiter).includes(L.uvDir));
   assert.equal(env.ELECTRON_RUN_AS_NODE, undefined);
