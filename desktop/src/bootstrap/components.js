@@ -144,13 +144,21 @@ function buildComponents({ L, manifest, platform, resources }) {
   const ffmpeg = {
     id: 'ffmpeg',
     weight: ffAsset ? ffAsset.bytes : 0,
-    version: manifest.ffmpeg.version,
+    version: (ffAsset && ffAsset.version) || manifest.ffmpeg.version,
     verify: () => exists(ffmpegExecutable(L, manifest, platform)),
     async install(ctx, report) {
-      if (!ffAsset) throw new Error('ffmpeg was not found. Install it first, for example with: brew install ffmpeg');
-      const archive = await fetchTo(ctx, ffAsset, 0, ffAsset.bytes, report);
-      await extractAtomic(archive, L.ffmpegDir);
-      await fsp.rm(archive, { force: true });
+      if (!ffAsset) throw new Error('No FFmpeg build is pinned for this system. Install ffmpeg yourself and put it on PATH.');
+      const download = await fetchTo(ctx, ffAsset, 0, ffAsset.bytes, report);
+      if (ffAsset.kind === 'binary') {
+        // A single static executable (macOS): nothing to unpack, just put it where the backend looks for it.
+        const dest = ffmpegExecutable(L, manifest, platform);
+        await fsp.mkdir(path.dirname(dest), { recursive: true });
+        await fsp.copyFile(download, dest);
+        await fsp.chmod(dest, 0o755);
+      } else {
+        await extractAtomic(download, L.ffmpegDir);
+      }
+      await fsp.rm(download, { force: true });
     },
   };
 
@@ -274,9 +282,10 @@ function buildComponents({ L, manifest, platform, resources }) {
   return [uv, ffmpeg, engineStep, backendEnv, aceStep, aceModels, demucs, weights];
 }
 
-/** Path of ffmpeg: bundled on Windows, taken from the system on macOS (Homebrew), where no pinned static build exists. */
+/** Path of ffmpeg: a pinned build under tools/ffmpeg where there is one, otherwise whatever the system has. */
 function ffmpegExecutable(L, manifest, platform) {
   const asset = manifest.ffmpeg.assets[platform];
+  if (asset && asset.kind === 'binary') return path.join(L.ffmpegDir, 'bin', IS_WINDOWS ? 'ffmpeg.exe' : 'ffmpeg');
   if (asset) return path.join(L.ffmpegDir, asset.binDir, IS_WINDOWS ? 'ffmpeg.exe' : 'ffmpeg');
   for (const dir of ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin']) {
     if (fs.existsSync(path.join(dir, 'ffmpeg'))) return path.join(dir, 'ffmpeg');

@@ -18,7 +18,7 @@ The frontend is unchanged: it uses relative `/api/...` URLs and the backend serv
 | System | State |
 | --- | --- |
 | Windows x64, NVIDIA RTX 20-series or newer, driver 580 or newer | supported, tested end to end |
-| macOS, Apple Silicon | packaged and set up by the same code, **not tested**; needs FFmpeg from Homebrew |
+| macOS, Apple Silicon | packaged and set up by the same code, first tested by hand on a Mac (see the notes in the branch history); nothing needs to be installed beforehand |
 | Linux | packaging config exists, the first-run screen reports "not supported" until there are setup scripts (PR #2) |
 
 Plan for about 35 GB of disk (measured: a full first run plus one generation) and a download of roughly 30 GB; the first-run screen asks for at least 50 GB free.
@@ -61,7 +61,7 @@ Everything lives under the chosen folder, so removing it removes the app's data:
 | --- | --- | --- |
 | `tools/uv` | uv (Python and environment manager) | astral-sh/uv release |
 | `tools/python` | managed Python 3.12 (uv never uses a system Python) | downloaded by uv |
-| `tools/ffmpeg` | FFmpeg (Windows) | Gyan builds, pinned |
+| `tools/ffmpeg` | FFmpeg: a zip build on Windows, one static binary on macOS (GPL builds, downloaded, never redistributed) | Gyan builds / shaka-project static-ffmpeg-binaries, pinned |
 | `engines/YuE2` | `audiocpp_server`, CUDA/Metal libraries, model downloader | audio.cpp release, pinned |
 | `engines/ACE-Step-1.5` | ACE-Step at the pinned commit with `external/patches/ace-step.patch` applied, plus its `uv sync` environment | GitHub source archive |
 | `engines/ACE-Step-1.5/checkpoints` | ACE-Step generation models (~9.4 GB), fetched with `acestep-download` so the first generation does not stall | Hugging Face |
@@ -108,6 +108,6 @@ setup runner) with Node's built-in runner.
 - The install folder can only be chosen on the first-run screen. Moving it later is not supported: the database stores
   absolute file paths.
 - No automatic updates yet (electron-updater from GitHub Releases is the plan) and no code signing.
-- macOS and Linux have not been run; the CI workflow only proves that they build.
+- macOS has had a first manual run only (FFmpeg was the first thing it tripped on); Linux has not been run; the CI workflow has never been run.
 - Model progress is estimated from the size of the models folder; the downloader prints little.
 - The setup needs Windows 10 1803 or newer (it uses the built-in `tar.exe`).

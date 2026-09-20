@@ -8,7 +8,7 @@ const { execFileSync } = require('node:child_process');
 const manifest = require('../manifest.json');
 const { evaluateGpu, freeBytes, runChecks } = require('../src/bootstrap/checks');
 const { runSetup, isSetupComplete, describePlan } = require('../src/bootstrap/run');
-const { buildComponents, demucsProject } = require('../src/bootstrap/components');
+const { buildComponents, demucsProject, ffmpegExecutable } = require('../src/bootstrap/components');
 const { extract, tarBinary } = require('../src/bootstrap/extract');
 const { layout, PLATFORM } = require('../src/paths');
 const { backendEnv } = require('../src/server');
@@ -135,6 +135,40 @@ test('the uv component finds the binary inside a tarball with a top-level folder
   const uv = buildComponents({ L, manifest: fake, platform: 'darwin-arm64', resources }).find((c) => c.id === 'uv');
   await uv.install({ L, manifest: fake, platform: 'darwin-arm64', signal: undefined }, () => {});
   assert.equal(fs.readFileSync(L.uvBin, 'utf8'), 'fake uv binary');
+});
+
+test('ffmpeg: a single static binary (the macOS build) is installed where the backend looks for it', async (t) => {
+  const http = require('node:http');
+  const crypto = require('node:crypto');
+  const body = Buffer.from('fake static ffmpeg');
+  const server = http.createServer((_req, res) => { res.writeHead(200, { 'content-length': body.length }); res.end(body); });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => { server.closeAllConnections(); server.close(); });
+
+  const fake = JSON.parse(JSON.stringify(manifest));
+  fake.ffmpeg.assets['darwin-arm64'] = {
+    version: 'test-1', kind: 'binary', url: `http://127.0.0.1:${server.address().port}/ffmpeg-osx-arm64`,
+    sha256: crypto.createHash('sha256').update(body).digest('hex'), bytes: body.length,
+  };
+  const L = layout(tmp(), 'darwin-arm64', fake);
+  const resources = { backend: path.join(__dirname, '..', '..', 'backend'), acePatch: path.join(__dirname, '..', '..', 'external', 'patches', 'ace-step.patch') };
+  const ffmpeg = buildComponents({ L, manifest: fake, platform: 'darwin-arm64', resources }).find((c) => c.id === 'ffmpeg');
+  assert.equal(await ffmpeg.verify({}), false);
+  await ffmpeg.install({ L, manifest: fake, platform: 'darwin-arm64' }, () => {});
+  const exe = ffmpegExecutable(L, fake, 'darwin-arm64');
+  assert.equal(fs.readFileSync(exe, 'utf8'), 'fake static ffmpeg');
+  assert.equal(path.dirname(exe), path.join(L.ffmpegDir, 'bin'));
+  assert.equal(await ffmpeg.verify({}), true);
+  assert.equal(ffmpeg.version, 'test-1', 'the recorded version follows the platform asset');
+  if (process.platform !== 'win32') assert.ok(fs.statSync(exe).mode & 0o100, 'executable bit set');
+});
+
+test('the Windows FFmpeg asset keeps its recorded version and folder layout', () => {
+  const L = layout(tmp(), 'win32-x64', manifest);
+  const resources = { backend: path.join(__dirname, '..', '..', 'backend'), acePatch: path.join(__dirname, '..', '..', 'external', 'patches', 'ace-step.patch') };
+  const ffmpeg = buildComponents({ L, manifest, platform: 'win32-x64', resources }).find((c) => c.id === 'ffmpeg');
+  assert.equal(ffmpeg.version, manifest.ffmpeg.version, 'unchanged, so existing installs are not re-downloaded');
+  assert.match(ffmpegExecutable(L, manifest, 'win32-x64'), /ffmpeg-9\.0\.1-essentials_build[\\/]bin[\\/]ffmpeg\.exe$/);
 });
 
 test('every uv asset in the manifest names a binary that is "uv" or ends in "/uv"', () => {

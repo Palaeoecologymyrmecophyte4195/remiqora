@@ -43,6 +43,13 @@
         "sha256": "fec81ae03971d9dd4be3ebe02e263bd2ec1d789483f931bdba5f5715e65da2e9",
         "bytes": 111253802,
         "binDir": "ffmpeg-9.0.1-essentials_build/bin"
+      },
+      "darwin-arm64": {
+        "version": "n8.1.2-1",
+        "kind": "binary",
+        "url": "https://github.com/shaka-project/static-ffmpeg-binaries/releases/download/n8.1.2-1/ffmpeg-osx-arm64",
+        "sha256": "e7b9fcd97f95f333512d6e8b8ac24d9dbc08f189f36047695499bd7b57214b22",
+        "bytes": 34074040
       }
     }
   },
