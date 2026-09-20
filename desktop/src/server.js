@@ -10,15 +10,26 @@ const { ffmpegExecutable } = require('./bootstrap/components');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function freePort() {
+function listenOnce(port) {
   return new Promise((resolve, reject) => {
     const srv = net.createServer();
     srv.once('error', reject);
-    srv.listen(0, '127.0.0.1', () => {
-      const { port } = srv.address();
-      srv.close(() => resolve(port));
+    srv.listen(port, '127.0.0.1', () => {
+      const bound = srv.address().port;
+      srv.close(() => resolve(bound));
     });
   });
+}
+
+/**
+ * A free local port. The UI runs at http://127.0.0.1:<port>, and the browser keeps localStorage (language,
+ * saved presets, LoRA list) per origin, so the port has to be the same on every start: `preferred` is tried first.
+ */
+async function freePort(preferred) {
+  if (preferred) {
+    try { return await listenOnce(preferred); } catch { /* taken by something else: pick another */ }
+  }
+  return listenOnce(0);
 }
 
 /** Environment of the backend and, through it, of the model servers it starts. */
@@ -53,13 +64,15 @@ class BackendServer extends EventEmitter {
     this.ctx = ctx;
     this.child = null;
     this.url = null;
+    this.port = null;
   }
 
-  async start({ timeoutMs = 90000 } = {}) {
+  async start({ timeoutMs = 90000, preferredPort } = {}) {
     const { L, resources } = this.ctx;
     await fsp.mkdir(L.logs, { recursive: true });
     await fsp.mkdir(L.data, { recursive: true });
-    const port = await freePort();
+    const port = await freePort(preferredPort);
+    this.port = port;
     const logStream = fs.createWriteStream(path.join(L.logs, 'backend-server.log'), { flags: 'a' });
     logStream.write(`\n--- start ${new Date().toISOString()} port ${port}\n`);
 

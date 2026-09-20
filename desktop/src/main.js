@@ -6,7 +6,7 @@ const manifest = require('../manifest.json');
 const { runChecks } = require('./bootstrap/checks');
 const { describePlan, runSetup, isSetupComplete } = require('./bootstrap/run');
 const { BackendServer } = require('./server');
-const { loadConfig, saveConfig, ensureWritableDir } = require('./config');
+const { loadConfig, updateConfig, ensureWritableDir } = require('./config');
 
 // Only these links can be opened from the first-run screen.
 const EXTERNAL = {
@@ -23,6 +23,7 @@ let ctx = null;
 let server = null;
 let setupAbort = null;
 let quitting = false;
+let savedPort = null;
 
 function buildContext(dataRoot) {
   return {
@@ -79,7 +80,11 @@ async function launch() {
     showSetup({ state: 'crashed', message: `The backend stopped (exit code ${code}).` });
   });
   try {
-    const url = await server.start();
+    const url = await server.start({ preferredPort: savedPort });
+    if (server.port !== savedPort) {
+      savedPort = server.port;
+      await updateConfig(app.getPath('userData'), { port: savedPort });
+    }
     await win.loadURL(url);
   } catch (err) {
     showSetup({ state: 'crashed', message: err.message });
@@ -127,13 +132,13 @@ function registerIpc() {
       return { ok: false, message: err.message };
     }
     ctx = buildContext(dir);
-    await saveConfig(app.getPath('userData'), { dataRoot: dir });
+    await updateConfig(app.getPath('userData'), { dataRoot: dir });
     return { ok: true };
   });
   ipcMain.handle('setup:start', async () => {
     // Remember the chosen folder right away: an interrupted setup resumes there on the next start.
     await ensureWritableDir(ctx.L.root);
-    await saveConfig(app.getPath('userData'), { dataRoot: ctx.L.root });
+    await updateConfig(app.getPath('userData'), { dataRoot: ctx.L.root });
     startSetup();
   });
   ipcMain.handle('setup:pause', () => { if (setupAbort) setupAbort.abort(new Error('paused')); });
@@ -145,6 +150,7 @@ function registerIpc() {
 
 async function boot() {
   const config = await loadConfig(app.getPath('userData'));
+  savedPort = config.port || null;
   ctx = buildContext(config.dataRoot || defaultDataRoot());
   registerIpc();
   Menu.setApplicationMenu(process.platform === 'darwin'

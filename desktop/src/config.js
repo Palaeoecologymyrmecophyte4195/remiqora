@@ -17,6 +17,13 @@ async function saveConfig(dir, config) {
   await fsp.writeFile(path.join(dir, 'config.json'), JSON.stringify(config, null, 2));
 }
 
+/** Merges `patch` into the saved settings (data root, remembered port, ...). */
+async function updateConfig(dir, patch) {
+  const next = { ...(await loadConfig(dir)), ...patch };
+  await saveConfig(dir, next);
+  return next;
+}
+
 /** The data root must be creatable and writable before anything is downloaded into it. */
 async function ensureWritableDir(dir) {
   await fsp.mkdir(dir, { recursive: true });
@@ -25,4 +32,4 @@ async function ensureWritableDir(dir) {
   await fsp.rm(probe, { force: true });
 }
 
-module.exports = { loadConfig, saveConfig, ensureWritableDir };
+module.exports = { loadConfig, saveConfig, updateConfig, ensureWritableDir };

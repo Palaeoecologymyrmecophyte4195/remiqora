@@ -98,6 +98,22 @@ test('Demucs gets the CUDA torch index off macOS only', () => {
   assert.doesNotMatch(demucsProject('darwin-arm64'), /pytorch-cu128/);
 });
 
+test('the backend keeps its port between starts so localStorage survives, and moves only when it must', async () => {
+  const net = require('node:net');
+  const { freePort } = require('../src/server');
+  const first = await freePort();
+  assert.equal(await freePort(first), first, 'a free preferred port is reused');
+  const blocker = net.createServer();
+  await new Promise((r) => blocker.listen(first, '127.0.0.1', r));
+  try {
+    const moved = await freePort(first);
+    assert.notEqual(moved, first, 'a taken port is replaced');
+    assert.ok(moved > 0);
+  } finally {
+    blocker.close();
+  }
+});
+
 test('the backend environment points every path at the data root', () => {
   const L = layout(tmp(), 'win32-x64', manifest);
   const env = backendEnv({ L, manifest, platform: 'win32-x64' });
