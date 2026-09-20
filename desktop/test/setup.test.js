@@ -111,6 +111,38 @@ test('the backend environment points every path at the data root', () => {
   assert.equal(env.ELECTRON_RUN_AS_NODE, undefined);
 });
 
+test('the uv component finds the binary inside a tarball with a top-level folder (the macOS layout)', async (t) => {
+  const http = require('node:http');
+  const crypto = require('node:crypto');
+  const src = tmp();
+  fs.mkdirSync(path.join(src, 'uv-aarch64-apple-darwin'), { recursive: true });
+  fs.writeFileSync(path.join(src, 'uv-aarch64-apple-darwin', 'uv'), 'fake uv binary');
+  fs.writeFileSync(path.join(src, 'uv-aarch64-apple-darwin', 'uvx'), 'fake uvx');
+  const archive = path.join(tmp(), 'uv.tar.gz');
+  execFileSync(tarBinary(), ['-czf', archive, '-C', src, 'uv-aarch64-apple-darwin']);
+  const body = fs.readFileSync(archive);
+  const server = http.createServer((_req, res) => { res.writeHead(200, { 'content-length': body.length }); res.end(body); });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => { server.closeAllConnections(); server.close(); });
+
+  const fake = JSON.parse(JSON.stringify(manifest));
+  fake.uv.assets['darwin-arm64'] = {
+    url: `http://127.0.0.1:${server.address().port}/uv-aarch64-apple-darwin.tar.gz`,
+    sha256: crypto.createHash('sha256').update(body).digest('hex'), bytes: body.length, bin: 'uv-aarch64-apple-darwin/uv',
+  };
+  const L = layout(tmp(), 'darwin-arm64', fake);
+  const resources = { backend: path.join(__dirname, '..', '..', 'backend'), acePatch: path.join(__dirname, '..', '..', 'external', 'patches', 'ace-step.patch') };
+  const uv = buildComponents({ L, manifest: fake, platform: 'darwin-arm64', resources }).find((c) => c.id === 'uv');
+  await uv.install({ L, manifest: fake, platform: 'darwin-arm64', signal: undefined }, () => {});
+  assert.equal(fs.readFileSync(L.uvBin, 'utf8'), 'fake uv binary');
+});
+
+test('every uv asset in the manifest names a binary that is "uv" or ends in "/uv"', () => {
+  for (const [platform, asset] of Object.entries(manifest.uv.assets)) {
+    assert.match(asset.bin, /(^|\/)uv(\.exe)?$/, platform);
+  }
+});
+
 test('extracts a tar.gz archive', async () => {
   const src = tmp();
   fs.mkdirSync(path.join(src, 'top', 'sub'), { recursive: true });

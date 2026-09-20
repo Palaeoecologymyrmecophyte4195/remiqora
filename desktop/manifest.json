@@ -19,19 +19,19 @@
         "url": "https://github.com/astral-sh/uv/releases/download/0.12.17/uv-aarch64-apple-darwin.tar.gz",
         "sha256": "85f00cbdc6dd3e97eba4c31b4d014375a9fdfe8f570023b84e5102fc3456896b",
         "bytes": 16929004,
-        "bin": "uv"
+        "bin": "uv-aarch64-apple-darwin/uv"
       },
       "darwin-x64": {
         "url": "https://github.com/astral-sh/uv/releases/download/0.12.17/uv-x86_64-apple-darwin.tar.gz",
         "sha256": "8dcf05a8c809bb3c471d2b614788ba27a6e41298fc8c31ac84b5f4339fd468e5",
         "bytes": 20592896,
-        "bin": "uv"
+        "bin": "uv-x86_64-apple-darwin/uv"
       },
       "linux-x64": {
         "url": "https://github.com/astral-sh/uv/releases/download/0.12.17/uv-x86_64-unknown-linux-gnu.tar.gz",
         "sha256": "fa82fd8dde8e8eefdecada6aa0889666556cfceb690d06e0c3bca49eb3070a63",
         "bytes": 19755224,
-        "bin": "uv"
+        "bin": "uv-x86_64-unknown-linux-gnu/uv"
       }
     }
   },

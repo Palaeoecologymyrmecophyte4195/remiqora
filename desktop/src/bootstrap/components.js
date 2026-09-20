@@ -85,6 +85,19 @@ torch = { index = "pytorch-cu128" }
 `;
 }
 
+/** First file called `name` anywhere under `dir` (archives differ: uv's zip is flat, its tarballs have a top folder). */
+async function findFile(dir, name) {
+  for (const entry of await fsp.readdir(dir, { withFileTypes: true })) {
+    const p = path.join(dir, entry.name);
+    if (entry.isFile() && entry.name === name) return p;
+    if (entry.isDirectory()) {
+      const inner = await findFile(p, name);
+      if (inner) return inner;
+    }
+  }
+  return null;
+}
+
 /** Moves the contents of an extracted engine archive into place: tools/ and model_specs/ next to bin/, the rest into bin/. */
 async function placeEngineFiles(extracted, L) {
   for (const name of await fsp.readdir(extracted)) {
@@ -119,7 +132,9 @@ function buildComponents({ L, manifest, platform, resources }) {
       await fsp.rm(tmp, { recursive: true, force: true });
       await extract(archive, tmp);
       await fsp.mkdir(L.uvDir, { recursive: true });
-      await fsp.copyFile(path.join(tmp, uvAsset.bin), L.uvBin);
+      const found = await findFile(tmp, path.basename(uvAsset.bin));
+      if (!found) throw new Error(`${path.basename(uvAsset.bin)} was not found inside the uv archive`);
+      await fsp.copyFile(found, L.uvBin);
       if (!IS_WINDOWS) await fsp.chmod(L.uvBin, 0o755);
       await fsp.rm(tmp, { recursive: true, force: true });
       await fsp.rm(archive, { force: true });
