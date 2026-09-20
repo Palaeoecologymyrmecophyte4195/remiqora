@@ -1,0 +1,2 @@
+# keep the ACE-Step patch byte-exact: the desktop installer applies it without Git
+external/patches/*.patch text eol=lf

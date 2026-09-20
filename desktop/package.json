@@ -1,0 +1,26 @@
+{
+  "name": "remiqora-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Remiqora desktop app: first-run setup, server lifecycle and installers",
+  "author": "Nikolay Cherkashin <inikolax@gmail.com>",
+  "license": "MIT",
+  "main": "src/main.js",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"test/*.test.js\"",
+    "prepare-resources": "node scripts/prepare-resources.js",
+    "dist": "npm run prepare-resources && electron-builder",
+    "dist:dir": "npm run prepare-resources && electron-builder --dir"
+  },
+  "dependencies": {
+    "diff": "^9.0.0"
+  },
+  "devDependencies": {
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3"
+  }
+}

@@ -1,0 +1,234 @@
+'use strict';
+const fs = require('node:fs');
+const fsp = require('node:fs/promises');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const { downloadFile } = require('./download');
+const { extract, extractAtomic } = require('./extract');
+const { applyGitPatch } = require('./patch');
+const { runCommand, cleanEnv } = require('../proc');
+const { IS_WINDOWS } = require('../paths');
+
+const exists = (p) => fsp.access(p).then(() => true, () => false);
+const sum = (list) => list.reduce((a, b) => a + b, 0);
+const sha1 = (text) => crypto.createHash('sha1').update(text).digest('hex').slice(0, 12);
+
+/** Environment for uv: everything (Python, wheel cache) stays under the data root the user chose. */
+function uvEnv(L) {
+  // only-managed: never bind the venvs to a system Python that the user may later remove or upgrade.
+  return cleanEnv({ UV_CACHE_DIR: L.uvCache, UV_PYTHON_INSTALL_DIR: L.pythonDir, UV_PYTHON_PREFERENCE: 'only-managed', UV_NO_PROGRESS: '1', NO_COLOR: '1', PYTHONUTF8: '1' });
+}
+
+async function dirSize(dir) {
+  let total = 0;
+  let entries;
+  try { entries = await fsp.readdir(dir, { withFileTypes: true }); } catch { return 0; }
+  for (const e of entries) {
+    const p = path.join(dir, e.name);
+    total += e.isDirectory() ? await dirSize(p) : (await fsp.stat(p).catch(() => ({ size: 0 }))).size;
+  }
+  return total;
+}
+
+/** Downloads one manifest file into the downloads cache and reports byte progress offset by `base`. */
+function fetchTo(ctx, file, base, total, report) {
+  return downloadFile({
+    url: file.url,
+    dest: path.join(ctx.L.downloads, path.basename(new URL(file.url).pathname)),
+    sha256: file.sha256,
+    signal: ctx.signal,
+    onProgress: (done) => report({ done: base + done, total }),
+  });
+}
+
+/** Demucs is a throwaway uv project. torch has to come from the CUDA wheel index, or it silently falls back to CPU. */
+function demucsProject(platform) {
+  const head = `[project]
+name = "demucs-runner"
+version = "0.1.0"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "demucs>=4.0.1",
+    "numpy>=1.26.4",
+    "torch>=2.11.0",
+]
+
+[tool.uv]
+package = false
+`;
+  if (platform.startsWith('darwin')) return head; // the plain PyPI wheel is MPS-capable on Apple Silicon
+  return `${head}
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+`;
+}
+
+/** Moves the contents of an extracted engine archive into place: tools/ and model_specs/ next to bin/, the rest into bin/. */
+async function placeEngineFiles(extracted, L) {
+  for (const name of await fsp.readdir(extracted)) {
+    const src = path.join(extracted, name);
+    const dst = ['tools', 'model_specs'].includes(name) ? path.join(L.yue2, name) : path.join(L.yue2Bin, name);
+    await fsp.mkdir(path.dirname(dst), { recursive: true });
+    await fsp.cp(src, dst, { recursive: true, force: true });
+  }
+}
+
+/**
+ * The ordered list of things the first run installs. Each component:
+ *   id, weight (bytes, for the overall bar), version (a change re-runs it),
+ *   verify(ctx) -> bool (sanity check on disk), install(ctx, report).
+ * report({ done, total, note }): byte progress is optional, `note` is a human line (uv output, ...).
+ */
+function buildComponents({ L, manifest, platform, resources }) {
+  const engine = manifest.engine.assets[platform];
+  const uvAsset = manifest.uv.assets[platform];
+  const ffAsset = manifest.ffmpeg.assets[platform];
+  const logFile = path.join(L.logs, 'setup.log');
+  const patchHash = () => fsp.readFile(resources.acePatch, 'utf8').then(sha1).catch(() => 'nopatch');
+
+  const uv = {
+    id: 'uv',
+    weight: uvAsset.bytes,
+    version: manifest.uv.version,
+    verify: () => exists(L.uvBin),
+    async install(ctx, report) {
+      const archive = await fetchTo(ctx, uvAsset, 0, uvAsset.bytes, report);
+      const tmp = path.join(L.downloads, 'uv-extract');
+      await fsp.rm(tmp, { recursive: true, force: true });
+      await extract(archive, tmp);
+      await fsp.mkdir(L.uvDir, { recursive: true });
+      await fsp.copyFile(path.join(tmp, uvAsset.bin), L.uvBin);
+      if (!IS_WINDOWS) await fsp.chmod(L.uvBin, 0o755);
+      await fsp.rm(tmp, { recursive: true, force: true });
+      await fsp.rm(archive, { force: true });
+    },
+  };
+
+  const ffmpeg = {
+    id: 'ffmpeg',
+    weight: ffAsset ? ffAsset.bytes : 0,
+    version: manifest.ffmpeg.version,
+    verify: () => exists(ffmpegExecutable(L, manifest, platform)),
+    async install(ctx, report) {
+      if (!ffAsset) throw new Error('ffmpeg was not found. Install it first, for example with: brew install ffmpeg');
+      const archive = await fetchTo(ctx, ffAsset, 0, ffAsset.bytes, report);
+      await extractAtomic(archive, L.ffmpegDir);
+      await fsp.rm(archive, { force: true });
+    },
+  };
+
+  const engineStep = {
+    id: 'engine',
+    weight: sum(engine.files.map((f) => f.bytes)),
+    version: manifest.engine.tag,
+    verify: () => exists(path.join(L.yue2Bin, IS_WINDOWS ? 'audiocpp_server.exe' : 'audiocpp_server')),
+    async install(ctx, report) {
+      const total = sum(engine.files.map((f) => f.bytes));
+      const staging = path.join(L.downloads, 'engine-staging');
+      await fsp.rm(staging, { recursive: true, force: true });
+      let base = 0;
+      for (const [i, file] of engine.files.entries()) {
+        const archive = await fetchTo(ctx, file, base, total, report);
+        base += file.bytes;
+        const out = path.join(staging, String(i));
+        await extract(archive, out);
+        await placeEngineFiles(out, L);
+        await fsp.rm(archive, { force: true });
+      }
+      if (!IS_WINDOWS) await fsp.chmod(path.join(L.yue2Bin, 'audiocpp_server'), 0o755);
+      await fsp.rm(staging, { recursive: true, force: true });
+    },
+  };
+
+  const backendEnv = {
+    id: 'backend-env',
+    weight: 60e6,
+    // Re-run when a new app version changes the backend's requirements.
+    version: `py3.12-${sha1(fs.existsSync(path.join(resources.backend, 'requirements.txt')) ? fs.readFileSync(path.join(resources.backend, 'requirements.txt'), 'utf8') : '')}`,
+    verify: () => exists(L.backendPython),
+    async install(ctx, report) {
+      const env = uvEnv(L);
+      const note = (line) => report({ note: line });
+      await runCommand(L.uvBin, ['venv', '--python', '3.12', '--allow-existing', L.backendVenv], { env, onLine: note, signal: ctx.signal, logFile });
+      await runCommand(L.uvBin, ['pip', 'install', '--python', L.backendPython, '-r', path.join(resources.backend, 'requirements.txt')], { env, onLine: note, signal: ctx.signal, logFile });
+    },
+  };
+
+  const aceStep = {
+    id: 'ace-step',
+    weight: manifest.aceStep.approxBytes,
+    version: manifest.aceStep.commit.slice(0, 7),
+    verify: async () => (await exists(path.join(L.aceStep, '.remiqora-patched'))) && (await exists(path.join(L.aceStep, '.venv'))),
+    async install(ctx, report) {
+      const marker = path.join(L.aceStep, '.remiqora-patched');
+      const wanted = await patchHash();
+      const patched = (await exists(marker)) && (await fsp.readFile(marker, 'utf8')).trim() === wanted;
+      if (!patched) {
+        // The source archive is a sliver of this component's weight; `uv sync` below is the bulk.
+        const archive = await fetchTo(ctx, { url: manifest.aceStep.url }, 0, manifest.aceStep.approxBytes, report);
+        const tmp = `${L.aceStep}.tmp`;
+        await fsp.rm(tmp, { recursive: true, force: true });
+        await extract(archive, tmp, { stripComponents: 1 });
+        await applyGitPatch(await fsp.readFile(resources.acePatch, 'utf8'), tmp);
+        await fsp.writeFile(path.join(tmp, '.remiqora-patched'), wanted);
+        await fsp.rm(L.aceStep, { recursive: true, force: true });
+        await fsp.rename(tmp, L.aceStep);
+        await fsp.rm(archive, { force: true });
+      }
+      await runCommand(L.uvBin, ['sync'], { cwd: L.aceStep, env: uvEnv(L), onLine: (line) => report({ note: line }), signal: ctx.signal, logFile });
+    },
+  };
+
+  const demucs = {
+    id: 'demucs',
+    weight: manifest.demucs.approxBytes,
+    version: `demucs-${sha1(demucsProject(platform))}`,
+    verify: () => exists(path.join(L.demucs, '.venv')),
+    async install(ctx, report) {
+      await fsp.mkdir(L.demucs, { recursive: true });
+      await fsp.writeFile(path.join(L.demucs, 'pyproject.toml'), demucsProject(platform));
+      await runCommand(L.uvBin, ['sync'], { cwd: L.demucs, env: uvEnv(L), onLine: (line) => report({ note: line }), signal: ctx.signal, logFile });
+    },
+  };
+
+  const weights = {
+    id: 'weights',
+    weight: manifest.weights.approxBytes,
+    version: manifest.weights.packages.join('+'),
+    verify: () => exists(path.join(L.yue2, 'models')),
+    async install(ctx, report) {
+      const total = manifest.weights.approxBytes;
+      const modelsDir = path.join(L.yue2, 'models');
+      // The downloader prints little; growth of the models folder is the honest progress signal.
+      const timer = setInterval(async () => report({ done: Math.min(await dirSize(modelsDir), total), total }), 1500);
+      try {
+        for (const pkg of manifest.weights.packages) {
+          report({ note: pkg });
+          await runCommand(L.backendPython, [path.join('tools', 'model_manager_v2.py'), 'install', pkg], { cwd: L.yue2, env: uvEnv(L), onLine: (line) => report({ note: line }), signal: ctx.signal, logFile });
+        }
+      } finally {
+        clearInterval(timer);
+      }
+    },
+  };
+
+  // Order matters: the backend venv provides the Python that runs the weights downloader.
+  return [uv, ffmpeg, engineStep, backendEnv, aceStep, demucs, weights];
+}
+
+/** Path of ffmpeg: bundled on Windows, taken from the system on macOS (Homebrew), where no pinned static build exists. */
+function ffmpegExecutable(L, manifest, platform) {
+  const asset = manifest.ffmpeg.assets[platform];
+  if (asset) return path.join(L.ffmpegDir, asset.binDir, IS_WINDOWS ? 'ffmpeg.exe' : 'ffmpeg');
+  for (const dir of ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin']) {
+    if (fs.existsSync(path.join(dir, 'ffmpeg'))) return path.join(dir, 'ffmpeg');
+  }
+  return path.join('/usr/local/bin', 'ffmpeg');
+}
+
+module.exports = { buildComponents, ffmpegExecutable, demucsProject, dirSize };
