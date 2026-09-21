@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://inikolax.github.io/remiqora/</loc>
+    <lastmod>2026-09-21</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://inikolax.github.io/remiqora/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://inikolax.github.io/remiqora/ru/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://inikolax.github.io/remiqora/"/>
+  </url>
+  <url>
+    <loc>https://inikolax.github.io/remiqora/ru/</loc>
+    <lastmod>2026-09-21</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://inikolax.github.io/remiqora/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://inikolax.github.io/remiqora/ru/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://inikolax.github.io/remiqora/"/>
+  </url>
+</urlset>
