@@ -34,6 +34,7 @@
   <a href="#yue2-and-sheetsage2-generation">YuE2</a> ·
   <a href="#lora-training-ace-step">LoRA</a> ·
   <a href="#built-in-daw">DAW</a> ·
+  <a href="#desktop-app-experimental">Desktop app</a> ·
   <a href="#built-with">Built with</a> ·
   <a href="#license--liability-for-generated-content">License</a> ·
   <a href="#-installation">Installation</a>
@@ -65,7 +66,7 @@ ACE-Step and YuE2 are two independent music generation engines, each with its ow
 | **MuScriptor** | Transcribes audio (the full mix or a single stem) into MIDI notes. |
 | **Built-in DAW** | A multitrack timeline editor for assembling tracks/stems into a final mix: an effects rack on every channel, auto-BPM and time-stretch, WAV/MP3 export. |
 
-The interface is fully bilingual (Russian/English, switcher in the header).
+The interface is fully bilingual (Russian/English). It starts in your system language, and the switcher in the header overrides it.
 
 ---
 
@@ -157,6 +158,7 @@ The **"?"** button in the toolbar opens built-in help: a list of hotkeys, mouse 
 
 - **`backend/`** — FastAPI (Python). `app/orchestrator/` manages the models' process lifecycle (start/stop/health-poll) and enforces their mutual exclusion on a single GPU. `app/api/routes_proxy.py` reverse-proxies `/api/ace/*` → ACE-Step's REST API (port 8001) and `/api/yue2/*` → YuE2's native server (`audiocpp_server.exe`, port 8080). `app/db.py` + `routes_tracks.py` are the shared SQLite database and files, organized per model, regardless of how a track was created (generation, upload, or assembled in the editor).
 - **`frontend/`** — Vue 3 + TypeScript + Tailwind v4 + Pinia + vue-router + vue-i18n. A fully native implementation (not an iframe) on top of the models' original APIs — `src/audio/` contains its own Web Audio engine (mixer, timeline, effects, a MIDI parser and synth, WAV/MP3 encoders).
+- **`desktop/`** — an optional Electron shell and installer: first-run setup, server lifecycle and packaging. It runs the same `backend/` and `frontend/`; see [`desktop/README.md`](desktop/README.md).
 - Only the models' own inference process (`acestep-api` and `audiocpp_server.exe`) runs from their original code — everything else (UI, proxying, storage, file upload/transcoding) is written in this repository. YuE2's own web UI (`web-ui/server.py`) is no longer used — the one useful part of it (transcoding non-WAV uploads via ffmpeg) has been ported to `backend/app/api/routes_yue2_upload.py`.
 
 ---
@@ -172,6 +174,8 @@ Remiqora is a UI and orchestrator on top of third-party inference engines. Their
 | [Demucs](https://github.com/adefossez/demucs) | Stem separation (`htdemucs`) | MIT |
 
 Patch details and exact base commits are in [`external/patches/README.md`](external/patches/README.md).
+
+The desktop app additionally uses [Electron](https://www.electronjs.org) (MIT), [electron-builder](https://www.electron.build) (MIT), [uv](https://docs.astral.sh/uv/) (MIT or Apache-2.0) and static FFmpeg builds (GPL) that it downloads on first launch instead of redistributing.
 
 ---
 
@@ -190,6 +194,36 @@ Remiqora's own code (this repository) is [MIT-licensed](LICENSE). That covers th
 ---
 
 ## 📦 Installation
+
+There are two ways to install Remiqora: the **desktop app** (experimental, described first) or the **scripts** (Steps 0–2 below).
+
+### Desktop app (experimental)
+
+For anyone who would rather not use a terminal, Remiqora also comes as a **desktop app** for **Windows** (NVIDIA RTX 20-series or newer, driver 580 or newer) and **macOS** (Apple Silicon). It opens in its own window and sets everything up on the first launch, so there is no Git, Python, CUDA Toolkit or compiler to install. The Windows installer installs per user and needs no administrator rights.
+
+<p align="center">
+  <img src="docs/screenshots/en/12-desktop-check.png" alt="First launch: the app checks the GPU, driver, free space and connection, and asks where to keep models and projects" width="48%">
+  <img src="docs/screenshots/en/13-desktop-download.png" alt="First launch: components downloading and installing, with overall and per-component progress" width="48%">
+</p>
+
+- **First launch.** The app checks the GPU, driver, free disk space and connection, lets you choose one folder for models and projects, and installs into it: the prebuilt audio.cpp engine (CUDA on Windows, Metal on macOS), ACE-Step, Demucs, the model weights and FFmpeg. Plan for roughly 30 GB of downloads and about 35 GB on disk (measured on Windows); the screen asks for 50 GB free. If it is interrupted, finished steps are skipped and downloads resume.
+- **Every launch after that.** The app starts the server and opens the interface. Closing the window stops the model servers and frees the GPU.
+- **Where things live.** Models, the database, generated audio and logs stay in the folder you chose, and nothing is uploaded anywhere. The folder cannot be moved later, because the database stores absolute paths.
+
+**Status.** Experimental. The installers are not signed yet, so Windows shows a SmartScreen warning ("More info" → "Run anyway") and macOS may ask you to allow the app ("Open Anyway" in System Settings → Privacy & Security). Prebuilt installers are not on the Releases page yet; to get one, build it yourself:
+
+```sh
+cd frontend && npm ci && cd ../desktop && npm ci
+npm run dist    # Windows: dist/Remiqora-Setup-<version>.exe · macOS (run it on a Mac): dist/Remiqora-<version>-arm64.dmg
+```
+
+[`desktop/README.md`](desktop/README.md) covers what the first run installs, the test switches and the known gaps.
+
+**What it is built with.** An [Electron](https://www.electronjs.org) shell around the same web UI and FastAPI backend, packaged with [electron-builder](https://www.electron.build) (an NSIS installer on Windows, a DMG on macOS). The first launch uses [uv](https://docs.astral.sh/uv/) for the Python environments, the [audio.cpp](https://github.com/0xShug0/audio.cpp) release binaries and static FFmpeg builds. Licenses are unchanged; in particular the YuE2-3B weights stay CC BY-NC 4.0.
+
+### Install from scripts
+
+The steps below install from scripts instead: Git, a terminal and, on Windows, the build tools.
 
 ### Step 0: build tools
 
@@ -343,4 +377,5 @@ CUDA_BIN_DIR=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4\bin
 - ACE-Step and YuE2 can't run at the same time — one GPU for both, the orchestrator switches between them mutually exclusively.
 - MIDI transcription requires YuE2 specifically to be active (the MuScriptor model loads into its process).
 - Windows (NVIDIA CUDA) and macOS/Apple Silicon (Metal/MPS) are supported — `.bat`/`.ps1` scripts for the former, `.sh` scripts for the latter. No Linux scripts yet, though the backend itself has no Windows-only code left blocking it.
+- The desktop installers are experimental: unsigned (a SmartScreen or Gatekeeper prompt), not on the Releases page yet, and the first launch downloads roughly 30 GB. The installer does not support Linux yet.
 - The macOS/Metal path is newer and less battle-tested than the Windows/CUDA one; expect it to be slower. By default it installs a prebuilt YuE2 binary pinned to a fixed release tag (no compiler needed); `--from-source` instead builds the same `dev` commit Windows uses, and may occasionally need that pin bumped if `dev` drifts.
