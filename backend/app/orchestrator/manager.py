@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from ..config import MODELS
+from ..config import ALLOW_CONCURRENT_MODELS, MODELS
 from .process import ManagedProcess
 from .state import ModelRuntimeState, ModelStatus, OrchestratorState
 
@@ -44,6 +44,9 @@ class OrchestratorManager:
             if self.state.models[model_id].status == ModelStatus.RUNNING:
                 self.state.active_model = model_id
                 return
+            current = self.state.active_model
+            if not ALLOW_CONCURRENT_MODELS and current is not None and current != model_id:
+                await self._stop_model(current)
             await self._start_model(model_id)
 
     async def stop_active(self) -> None:

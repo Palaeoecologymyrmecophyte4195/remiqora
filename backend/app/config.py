@@ -127,6 +127,7 @@ ACE_STEP_API_PORT = int(os.getenv("ACE_STEP_API_PORT", "8001"))
 YUE2_SERVER_PORT = int(os.getenv("YUE2_SERVER_PORT", "8080"))
 YUE2_SERVER_HOST = os.getenv("YUE2_SERVER_HOST", "127.0.0.1")
 YUE2_DEVICE = os.getenv("YUE2_DEVICE", "").strip()
+ALLOW_CONCURRENT_MODELS = bool(ACE_STEP_DEVICE and YUE2_DEVICE and ACE_STEP_DEVICE != YUE2_DEVICE)
 CUDA_LIB_DIR = _env_path("CUDA_LIB_DIR", str(CUDA_BIN_DIR.parent / "lib"))
 
 # audiocpp_server is built from source by setup_models.ps1 on Windows (CUDA
@@ -201,7 +202,7 @@ MODELS: dict[str, ModelDefinition] = {
                 ],
                 extra_path_dirs=_YUE2_EXTRA_PATH_DIRS,
                 env=(
-                    {"LD_LIBRARY_PATH": f"{CUDA_LIB_DIR}{os.pathsep}{os.environ.get("LD_LIBRARY_PATH", "")}"}
+                    {"LD_LIBRARY_PATH": f"{CUDA_LIB_DIR}{os.pathsep}{os.environ.get('LD_LIBRARY_PATH', '')}"}
                     if IS_LINUX else {}
                 ),
                 health_url=f"http://127.0.0.1:{YUE2_SERVER_PORT}/health",

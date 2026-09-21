@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-HOST="${REMIQORA_HOST:-0.0.0.0}"
+HOST="${REMIQORA_HOST:-127.0.0.1}"
 PORT="${REMIQORA_PORT:-9000}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 NODE_BIN="${NODE_BIN:-node}"

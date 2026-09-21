@@ -303,7 +303,7 @@ tag instead, so it doesn't drift on its own.
 ```
 Builds audio.cpp with its native Linux CUDA backend, installs ACE-Step and Demucs in isolated environments, downloads the model weights, and writes `backend/.env`. It expects git, Python 3.11/3.12, uv, Node.js 20.19+ (or 22.12+), npm, CMake, ffmpeg, and a CUDA toolkit with nvcc plus cuBLAS/cuFFT development headers. The NVIDIA driver is deliberately not installed or modified.
 
-Tool paths are overrideable (`UV_BIN`, `NODE_BIN`, `NPM_BIN`, `CMAKE_BIN`, `NVCC_BIN`, `CUDA_TOOLKIT_PREFIX`, `CUDA_LIB_DIR`). On multi-GPU hosts, `ACE_STEP_DEVICE=0 YUE2_DEVICE=1 ./setup_linux.sh` pins the engines separately; leave both unset for default device selection. Validated end-to-end on Ubuntu 24.04 x86_64 with NVIDIA CUDA.
+Tool paths are overrideable (`UV_BIN`, `NODE_BIN`, `NPM_BIN`, `CMAKE_BIN`, `NVCC_BIN`, `CUDA_TOOLKIT_PREFIX`, `CUDA_LIB_DIR`). On multi-GPU hosts, `ACE_STEP_DEVICE=0 YUE2_DEVICE=1 ./setup_linux.sh` pins the engines separately and enables concurrent model residency when the two explicit device values differ; leave either value unset (or set both to the same device) to retain the default exclusive switching behavior. Validated end-to-end on Ubuntu 24.04 x86_64 with NVIDIA CUDA.
 
 ### Step 2: run
 
@@ -320,7 +320,7 @@ Builds the client via `npm run build` and serves the finished SPA bundle togethe
 
 Stem separation's `demucs` uv project is set up by `setup_models.bat` above; the `htdemucs` weights themselves download automatically on first use.
 
-**On Linux:** `./prod_run_linux.sh` builds the frontend and serves the SPA and API on `0.0.0.0:9000` by default. Override with `REMIQORA_HOST` / `REMIQORA_PORT`.
+**On Linux:** `./prod_run_linux.sh` builds the frontend and serves the SPA and API on `127.0.0.1:9000` by default. Override with `REMIQORA_HOST` / `REMIQORA_PORT`. To opt in to LAN access, run `REMIQORA_HOST=0.0.0.0 ./prod_run_linux.sh`; Remiqora has no built-in authentication, so only expose it on a trusted network or behind an authenticated reverse proxy.
 
 **On macOS:** `./dev.sh` and `./prod_run.sh` are the equivalents — same
 behavior, except the backend/frontend run as background jobs of the script
@@ -350,7 +350,7 @@ CUDA_BIN_DIR=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4\bin
 
 ## Known limitations
 
-- ACE-Step and YuE2 may remain running at the same time. On multi-GPU Linux hosts, `ACE_STEP_DEVICE` and `YUE2_DEVICE` can pin them to separate GPUs; on a single constrained GPU, running both simultaneously may exceed available VRAM.
+- ACE-Step and YuE2 switch exclusively by default. On multi-GPU Linux hosts, explicitly setting both `ACE_STEP_DEVICE` and `YUE2_DEVICE` to different device values opts into concurrent residency and pins each engine to its own GPU.
 - MIDI transcription requires YuE2 specifically to be active (the MuScriptor model loads into its process).
 - Windows (NVIDIA CUDA), macOS/Apple Silicon (Metal/MPS), and Linux x86_64 (NVIDIA CUDA) have setup/run paths. Linux builds audio.cpp from source and therefore requires a CUDA development toolkit in addition to the NVIDIA driver.
 - The macOS/Metal path is newer and less battle-tested than the Windows/CUDA one; expect it to be slower. By default it installs a prebuilt YuE2 binary pinned to a fixed release tag (no compiler needed); `--from-source` instead builds the same `dev` commit Windows uses, and may occasionally need that pin bumped if `dev` drifts.
