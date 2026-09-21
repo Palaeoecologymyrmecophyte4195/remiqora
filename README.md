@@ -201,6 +201,8 @@ There are two ways to install Remiqora: the **desktop app** (experimental, descr
 
 For anyone who would rather not use a terminal, Remiqora also comes as a **desktop app** for **Windows** (NVIDIA RTX 20-series or newer, driver 580 or newer) and **macOS** (Apple Silicon). It opens in its own window and sets everything up on the first launch, so there is no Git, Python, CUDA Toolkit or compiler to install. The Windows installer installs per user and needs no administrator rights.
 
+**Download (v0.2.0, pre-release):** [Windows installer (.exe)](https://github.com/inikolax/remiqora/releases/download/v0.2.0/Remiqora-Setup-0.2.0.exe) · [macOS installer (.dmg, Apple Silicon)](https://github.com/inikolax/remiqora/releases/download/v0.2.0/Remiqora-0.2.0-arm64.dmg) · [all files and SHA-256 sums](https://github.com/inikolax/remiqora/releases/tag/v0.2.0)
+
 <p align="center">
   <img src="docs/screenshots/en/12-desktop-check.png" alt="First launch: the app checks the GPU, driver, free space and connection, and asks where to keep models and projects" width="48%">
   <img src="docs/screenshots/en/13-desktop-download.png" alt="First launch: components downloading and installing, with overall and per-component progress" width="48%">
@@ -210,7 +212,7 @@ For anyone who would rather not use a terminal, Remiqora also comes as a **deskt
 - **Every launch after that.** The app starts the server and opens the interface. Closing the window stops the model servers and frees the GPU.
 - **Where things live.** Models, the database, generated audio and logs stay in the folder you chose, and nothing is uploaded anywhere. The folder cannot be moved later, because the database stores absolute paths.
 
-**Status.** Experimental. The installers are not signed yet, so Windows shows a SmartScreen warning ("More info" → "Run anyway") and macOS may ask you to allow the app ("Open Anyway" in System Settings → Privacy & Security). Prebuilt installers are not on the Releases page yet; to get one, build it yourself:
+**Status.** Experimental. The installers are not signed yet, so Windows shows a SmartScreen warning ("More info" → "Run anyway") and macOS may ask you to allow the app ("Open Anyway" in System Settings → Privacy & Security). The SHA-256 sum of every file is in `SHA256SUMS.txt` on the release page. To build an installer yourself instead:
 
 ```sh
 cd frontend && npm ci && cd ../desktop && npm ci
@@ -377,5 +379,5 @@ CUDA_BIN_DIR=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4\bin
 - ACE-Step and YuE2 can't run at the same time — one GPU for both, the orchestrator switches between them mutually exclusively.
 - MIDI transcription requires YuE2 specifically to be active (the MuScriptor model loads into its process).
 - Windows (NVIDIA CUDA) and macOS/Apple Silicon (Metal/MPS) are supported — `.bat`/`.ps1` scripts for the former, `.sh` scripts for the latter. No Linux scripts yet, though the backend itself has no Windows-only code left blocking it.
-- The desktop installers are experimental: unsigned (a SmartScreen or Gatekeeper prompt), not on the Releases page yet, and the first launch downloads roughly 30 GB. The installer does not support Linux yet.
+- The desktop installers are experimental: unsigned (a SmartScreen or Gatekeeper prompt), and the first launch downloads roughly 30 GB. The installer does not support Linux yet.
 - The macOS/Metal path is newer and less battle-tested than the Windows/CUDA one; expect it to be slower. By default it installs a prebuilt YuE2 binary pinned to a fixed release tag (no compiler needed); `--from-source` instead builds the same `dev` commit Windows uses, and may occasionally need that pin bumped if `dev` drifts.
