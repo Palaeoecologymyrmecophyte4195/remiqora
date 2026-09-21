@@ -29,10 +29,14 @@ test('checks refuse unsupported platforms and report free space', async () => {
   assert.ok((await freeBytes(path.join(dir, 'not', 'created', 'yet'))) > 0);
   const linux = await runChecks({ platform: 'linux-x64', dataRoot: dir, manifest, fetchImpl: async () => ({}) });
   assert.equal(linux.blocking.code, 'unsupported-platform');
-  const offline = await runChecks({ platform: 'darwin-arm64', dataRoot: dir, manifest, fetchImpl: async () => { throw new Error('down'); } });
+  // The real requirement is 50 GB, which a CI runner or a small disk may not have: take the disk out of this test.
+  const roomy = { ...manifest, requirements: { ...manifest.requirements, minFreeBytes: 1 } };
+  const offline = await runChecks({ platform: 'darwin-arm64', dataRoot: dir, manifest: roomy, fetchImpl: async () => { throw new Error('down'); } });
   assert.equal(offline.blocking.code, 'offline');
-  const online = await runChecks({ platform: 'darwin-arm64', dataRoot: dir, manifest, fetchImpl: async () => ({ status: 200 }) });
+  const online = await runChecks({ platform: 'darwin-arm64', dataRoot: dir, manifest: roomy, fetchImpl: async () => ({ status: 200 }) });
   assert.equal(online.blocking, null);
+  const full = await runChecks({ platform: 'darwin-arm64', dataRoot: dir, manifest: { ...manifest, requirements: { ...manifest.requirements, minFreeBytes: Number.MAX_SAFE_INTEGER } }, fetchImpl: async () => ({ status: 200 }) });
+  assert.equal(full.blocking.code, 'no-disk');
 });
 
 /** Fake components: the runner does not care what a component installs. */

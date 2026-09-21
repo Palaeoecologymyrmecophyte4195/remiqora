@@ -285,8 +285,9 @@ function buildComponents({ L, manifest, platform, resources }) {
 /** Path of ffmpeg: a pinned build under tools/ffmpeg where there is one, otherwise whatever the system has. */
 function ffmpegExecutable(L, manifest, platform) {
   const asset = manifest.ffmpeg.assets[platform];
-  if (asset && asset.kind === 'binary') return path.join(L.ffmpegDir, 'bin', IS_WINDOWS ? 'ffmpeg.exe' : 'ffmpeg');
-  if (asset) return path.join(L.ffmpegDir, asset.binDir, IS_WINDOWS ? 'ffmpeg.exe' : 'ffmpeg');
+  const exe = platform.startsWith('win32') ? 'ffmpeg.exe' : 'ffmpeg';   // by the platform asked for, not by the host running the code
+  if (asset && asset.kind === 'binary') return path.join(L.ffmpegDir, 'bin', exe);
+  if (asset) return path.join(L.ffmpegDir, asset.binDir, exe);
   for (const dir of ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin']) {
     if (fs.existsSync(path.join(dir, 'ffmpeg'))) return path.join(dir, 'ffmpeg');
   }
