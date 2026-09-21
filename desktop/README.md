@@ -88,6 +88,7 @@ its files are still on disk, so a new app version with new pins downloads just w
 | `REMIQORA_HOME` | default install folder (also skips the per-OS default) |
 | `REMIQORA_USER_DATA` | Electron user-data folder, to isolate the saved settings |
 | `REMIQORA_SKIP_COMPONENTS` | comma-separated ids to skip, e.g. `ace-step,demucs,weights` for a quick run |
+| `REMIQORA_LANG` | force the first-run screen language, `en` or `ru` (otherwise the system language) |
 | `REMIQORA_DEVTOOLS` | open DevTools when running from source |
 
 ### Full end-to-end test

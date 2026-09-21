@@ -113,7 +113,8 @@ function registerIpc() {
       version: app.getVersion(),
       platform: PLATFORM,
       // Every preferred language, like the app itself: Russian anywhere in the list selects Russian.
-      languages: [app.getLocale(), ...app.getPreferredSystemLanguages()],
+      // REMIQORA_LANG=en|ru forces the language (screenshots, trying another language on this machine).
+      languages: process.env.REMIQORA_LANG ? [process.env.REMIQORA_LANG] : [app.getLocale(), ...app.getPreferredSystemLanguages()],
       dataRoot: ctx.L.root,
       plan,
       totalBytes: plan.reduce((sum, c) => sum + c.weight, 0),
