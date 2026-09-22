@@ -14,6 +14,7 @@
 <p align="center">🚧 В активной разработке — возможны breaking changes, баги и шероховатости. Ещё не стабильный релиз.</p>
 
 <p align="center">
+  <a href="https://remiqora.com/"><img alt="Сайт" src="https://img.shields.io/badge/сайт-remiqora.com-22d3ee?style=flat-square"></a>
   <img alt="Статус" src="https://img.shields.io/badge/статус-в%20разработке-eab308?style=flat-square">
   <a href="LICENSE.ru.md"><img alt="Лицензия" src="https://img.shields.io/badge/лицензия-MIT-22c55e?style=flat-square"></a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-0f0f14?style=flat-square">

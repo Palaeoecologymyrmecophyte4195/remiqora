@@ -14,6 +14,7 @@
 <p align="center">🚧 Actively in development — expect breaking changes, bugs, and rough edges. Not a stable release yet.</p>
 
 <p align="center">
+  <a href="https://remiqora.com/"><img alt="Website" src="https://img.shields.io/badge/website-remiqora.com-22d3ee?style=flat-square"></a>
   <img alt="Status" src="https://img.shields.io/badge/status-in%20development-eab308?style=flat-square">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square"></a>
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-0f0f14?style=flat-square">
