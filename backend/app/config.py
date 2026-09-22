@@ -19,6 +19,12 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
+# Privacy: the libraries under the model servers (huggingface_hub and friends) may send anonymous usage pings.
+# Every child process inherits this environment, so setting it here covers ACE-Step, audio.cpp's tools and Demucs.
+# setdefault keeps an explicit choice in the user's own environment or .env.
+os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+os.environ.setdefault("DO_NOT_TRACK", "1")
+
 IS_WINDOWS = sys.platform == "win32"
 
 
