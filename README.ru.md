@@ -17,7 +17,7 @@
   <a href="https://remiqora.com/"><img alt="Сайт" src="https://img.shields.io/badge/сайт-remiqora.com-22d3ee?style=flat-square"></a>
   <img alt="Статус" src="https://img.shields.io/badge/статус-в%20разработке-eab308?style=flat-square">
   <a href="LICENSE.ru.md"><img alt="Лицензия" src="https://img.shields.io/badge/лицензия-MIT-22c55e?style=flat-square"></a>
-  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-0f0f14?style=flat-square">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f0f14?style=flat-square">
   <img alt="GPU" src="https://img.shields.io/badge/GPU-NVIDIA%20CUDA%20%7C%20Apple%20Metal-76B900?style=flat-square">
   <img alt="Stack" src="https://img.shields.io/badge/stack-Vue%203%20%2B%20FastAPI-a855f7?style=flat-square">
   <img alt="UI languages" src="https://img.shields.io/badge/UI-RU%20%2F%20EN-ec4899?style=flat-square">
@@ -338,6 +338,16 @@ MacBook Air, Apple M5, 24 ГБ RAM — включая прогон с абсол
 уйдёт вперёд; путь с готовым релизом закреплён на фиксированном теге и сам
 по себе не «уезжает».
 
+**На Linux (NVIDIA CUDA):**
+```sh
+./setup_linux.sh
+```
+Собирает audio.cpp с нативным Linux CUDA-бэкендом, ставит ACE-Step и Demucs в изолированные окружения, скачивает веса моделей и записывает `backend/.env`. Скрипту нужны git, Python 3.11/3.12, uv, Node.js 20.19+ (или 22.12+), npm, CMake, ffmpeg и CUDA toolkit с nvcc и dev-заголовками cuBLAS/cuFFT. Видеодрайвер NVIDIA сознательно не устанавливается и не трогается.
+
+Пути к инструментам переопределяются (`UV_BIN`, `NODE_BIN`, `NPM_BIN`, `CMAKE_BIN`, `NVCC_BIN`, `CUDA_TOOLKIT_PREFIX`, `CUDA_LIB_DIR`). На многокарточных хостах `ACE_STEP_DEVICE=0 YUE2_DEVICE=1 ./setup_linux.sh` закрепляет движки за разными GPU и включает одновременную резидентность моделей, если оба значения устройств заданы явно и различаются; если оставить любое из них пустым (или задать оба одинаковыми) — сохраняется взаимоисключающее переключение по умолчанию.
+
+Поддержка Linux сделана силами сообщества (контрибьютор [Spankie0001](https://github.com/Spankie0001)): проверена мной end-to-end на Ubuntu 24.04 через WSL2 с проброшенной GPU (RTX 4080, CUDA 13.3) — сборка, оба движка с реальной генерацией, переключение оркестратора в обе стороны и чистое завершение процессов без утечки GPU-памяти. Не проверялось: другие дистрибутивы, голое железо, AMD/Vulkan, Demucs и MuScriptor.
+
 ### Шаг 2: запуск
 
 ```cmd
@@ -352,6 +362,8 @@ prod_run.bat
 Собирает клиент через `npm run build` и раздаёт готовый SPA-дистрибутив вместе с API на [http://127.0.0.1:9000](http://127.0.0.1:9000).
 
 Uv-проект `demucs` для разделения на стемы поднимает сам `setup_models.bat` (см. выше); веса `htdemucs` скачиваются отдельно и сами при первом использовании.
+
+**На Linux:** `./prod_run_linux.sh` собирает фронтенд и раздаёт SPA вместе с API на `127.0.0.1:9000` по умолчанию. Переопределяется через `REMIQORA_HOST` / `REMIQORA_PORT`. Чтобы разрешить доступ из локальной сети, запустите `REMIQORA_HOST=0.0.0.0 ./prod_run_linux.sh`; у Remiqora нет встроенной авторизации, поэтому открывайте её только в доверенной сети или за прокси с авторизацией.
 
 **На macOS:** аналоги — `./dev.sh` и `./prod_run.sh`, ведут себя так же, только
 бэкенд и фронтенд запускаются как фоновые задачи самого скрипта (остановить
@@ -381,8 +393,8 @@ CUDA_BIN_DIR=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4\bin
 
 ## Известные ограничения
 
-- ACE-Step и YuE2 не могут работать одновременно — одна GPU на двоих, оркестратор переключает их взаимоисключающе.
+- ACE-Step и YuE2 по умолчанию переключаются взаимоисключающе. На многокарточных Linux-хостах явное указание `ACE_STEP_DEVICE` и `YUE2_DEVICE` включает одновременную резидентность и закрепляет каждый движок за своей GPU.
 - Транскрипция в MIDI требует активной именно YuE2 (модель MuScriptor подгружается в её процесс).
-- Поддерживаются Windows (NVIDIA CUDA) и macOS/Apple Silicon (Metal/MPS) — под первую написаны `.bat`/`.ps1`, под вторую `.sh`. Скриптов под Linux пока нет, хотя сам бэкенд уже не содержит Windows-специфичного кода, который бы это блокировал.
-- Установщики настольного приложения экспериментальные: без подписи (запрос SmartScreen или Gatekeeper), а первый запуск скачивает около 30 ГБ. Linux установщик пока не поддерживает.
+- Windows (NVIDIA CUDA), macOS/Apple Silicon (Metal/MPS) и Linux x86_64 (NVIDIA CUDA) имеют пути установки и запуска — под первую написаны `.bat`/`.ps1`, под остальные две — `.sh`. Поддержка Linux сделана силами сообщества: собирает audio.cpp из исходников и требует CUDA-тулкит помимо драйвера, проверена end-to-end на Ubuntu 24.04 (через WSL2 с проброшенной GPU), а не на голом железе или других дистрибутивах.
+- Установщики настольного приложения экспериментальные: без подписи (запрос SmartScreen или Gatekeeper), а первый запуск скачивает около 30 ГБ. Установщик пока не поддерживает Linux — на Linux нужно запускать из исходников через `setup_linux.sh`.
 - Путь macOS/Metal новее и меньше обкатан, чем Windows/CUDA — ожидайте, что будет медленнее. По умолчанию он ставит YuE2 из готового релиза с закреплённым тегом (компилятор не нужен); `--from-source` собирает тот же коммит `dev`, что и Windows, и может изредка требовать сдвинуть этот пин, если `dev` уйдёт вперёд.
