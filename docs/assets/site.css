@@ -185,6 +185,7 @@ ul.plain li { padding: 12px 0; border-top: 1px solid var(--hairline); color: var
 ul.plain li:last-child { border-bottom: 1px solid var(--hairline); }
 
 .cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px clamp(24px, 4vw, 64px); }
+.cols--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .code { min-width: 0; background: var(--panel); border: 1px solid var(--edge); border-radius: 12px; }
 .code pre { margin: 0; padding: 20px; overflow-x: auto; font: 400 .9375rem/1.7 var(--mono); color: var(--paper); }
 .copy { display: block; min-height: 44px; margin: 0 12px 12px auto; padding: 0 16px; background: var(--panel-2); border: 1px solid var(--edge); border-radius: 8px; color: var(--paper); font: 600 .9375rem/1 var(--body); cursor: pointer; }
@@ -207,7 +208,7 @@ ul.plain li:last-child { border-bottom: 1px solid var(--hairline); }
   .board { margin-top: clamp(-40px, -4vw, -20px); }
 }
 @media (max-width: 860px) {
-  .steps, .editor, .cols, .desktop__text, .desktop__shots { grid-template-columns: minmax(0, 1fr); }
+  .steps, .editor, .cols, .cols--3, .desktop__text, .desktop__shots { grid-template-columns: minmax(0, 1fr); }
   .step, .step--wide, .step--last { grid-template-columns: 3rem minmax(0, 1fr); }
   .desktop__text > ul.plain { grid-column: 1; grid-row: auto; margin-top: 24px; }
   .step--wide .shot { grid-column: 1 / -1; grid-row: auto; margin-top: 20px; }
