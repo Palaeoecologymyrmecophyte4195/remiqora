@@ -1,8 +1,0 @@
-blank_issues_enabled: false
-contact_links:
-  - name: Question or help
-    url: https://github.com/inikolax/remiqora/discussions
-    about: Ask questions and share ideas in Discussions.
-  - name: Report a security vulnerability
-    url: https://github.com/inikolax/remiqora/security/advisories/new
-    about: Please report security issues privately, not as a public issue.

